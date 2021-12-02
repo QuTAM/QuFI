@@ -6,7 +6,7 @@ from qiskit import *
 from qiskit import Aer
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister, transpile, assemble
 from qiskit.providers.aer import AerSimulator
-from qiskit.test.mock import FakeSantiago, FakeGuadalupe, FakeCasablanca, FakeSydney
+from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
 #Santiago 5 qubits
 #Casablanca 7 qubits
 #Guadalupe 16 qubits

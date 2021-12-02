@@ -8,7 +8,7 @@ from qiskit import *
 from qiskit import Aer
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister, transpile, assemble
 from qiskit.providers.aer import AerSimulator
-from qiskit.test.mock import FakeSantiago, FakeGuadalupe, FakeCasablanca, FakeSydney
+from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
 #Santiago 5 qubits
 #Casablanca 7 qubits
 #Guadalupe 16 qubits
@@ -91,16 +91,21 @@ def insert_gate(base_circuit, index, qubit, theta=0, phi=0, lam=0):
 
     for i in range(0, len(base_circuit.data)):
         mycircuit.data.append(base_circuit.data[i])
-        if i == index:
+        if i == index and qubit in mycircuit.qubits:
             # mycircuit.barrier(range(0, n+1))
             mycircuit.u(theta, phi, lam, qubit)
             # mycircuit.barrier(range(0, n+1))
     return mycircuit
 
-def generate_circuits(base_circuit, theta=0, phi=0, lam=0):
+def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0, lam=0):
+    qubit_couples = backend.configuration().to_dict()['coupling_map'] #actual physical neighboring qubits
+    mapping = transpiled_circuit._layout.get_virtual_bits()  #from logical to physical qubits
+    mapping_inv = transpiled_circuit._layout.get_physical_bits()  #from physical to logical qubits
+
     mycircuits = []
     qregs = len(base_circuit.qubits)
     cregs = len(base_circuit.clbits)
+
     for i in range(0, len(base_circuit.data)):
         gate = base_circuit.data[i][0]
         qubits = base_circuit.data[i][1]
@@ -110,14 +115,24 @@ def generate_circuits(base_circuit, theta=0, phi=0, lam=0):
             continue
 
         # If gate are not using a single qubit, insert one gate after each qubit
-        for qb in qubits:
-            if qb.index == 1: # insert faults only on qubit 1, second faults will be on qubits 0 and 2
-                circuits_double_fault = generate_second_fault_circuits_same_angle(insert_gate(base_circuit, i, qb, theta, phi, lam), theta, phi)
-                mycircuits.extend(circuits_double_fault)
+        for logical_qb in qubits:
+            physical_qubit = mapping[logical_qb]
+            neighbors_qubits = [el[1] for el in qubit_couples if el[0]==physical_qubit] 
+            
+            single_fault_circuit = insert_gate(base_circuit, i, logical_qb, theta, phi, lam)
+
+            for neighbor in neighbors_qubits:
+                for second_theta, second_phi in product(np.arange(0, theta+0.01, np.pi/12), np.arange(0, phi+0.01, np.pi/12)):
+                    mycircuits.append(insert_gate(single_fault_circuit, i, mapping_inv[neighbor], second_theta, second_phi, lam))
+
+            #if qb.index == 1: # insert faults only on qubit 1, second faults will be on qubits 0 and 2
+                #circuits_double_fault = generate_second_fault_circuits_same_angle(insert_gate(base_circuit, i, qb, theta, phi, lam), theta, phi)
+                #mycircuits.extend(circuits_double_fault)
+
     print('{} circuits generated for theta {} and phi {}'.format(len(mycircuits), theta, phi))
     return mycircuits
 
-def run_circuits(base_circuit, generated_circuits):
+def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     print('running circuits')
     aer_sim = Aer.get_backend('qasm_simulator')
     shots = 1024
@@ -126,12 +141,9 @@ def run_circuits(base_circuit, generated_circuits):
     results_gold = aer_sim.run(qobj_gold).result()
     answer_gold = results_gold.get_counts()
     
-    device_backend = FakeSydney()#FakeSantiago()
-    sim_santiago = AerSimulator.from_backend(device_backend)
-    # Transpile the circuit for the noisy basis gates
-    tcirc = transpile(base_circuit, sim_santiago)
+    
     # Execute noisy simulation and get counts
-    result_noise = sim_santiago.run(tcirc).result()
+    result_noise = sim_santiago.run(transpiled_circuit).result()
     answer_gold_noise = result_noise.get_counts(0)
 
     answers = []
@@ -182,22 +194,28 @@ def computeQSR(gold, answers, threshold):
     qsr = (good_count/len(answers))
     return qsr
 
-def inject(circuit, name ):
+def inject(circuit, name, backend):
     print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit}
     output['qiskit_version'] = qiskit.__qiskit_version__
     #output['circuits_injections'] = generate_circuits(circuit, theta, phi, lam)
     #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     output['circuits_injections'] = []
+
+    simulator = AerSimulator.from_backend(backend)
+    # Transpile the circuit for the noisy basis gates
+    tcirc = transpile(circuit, simulator)
+
     #theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
     #phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
     angle_values = product(theta_values, phi_values)
     for angles in angle_values:
         theta = angles[0]
         phi = angles[1]
-        output['circuits_injections'].extend(generate_circuits(circuit, theta, phi))
+        generated_circuits = generate_circuits(circuit, backend, tcirc, theta, phi)
+        output['circuits_injections'].extend(generated_circuits)
     print('{} total circuits generated'.format(len(output['circuits_injections'])))
-    #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
+    output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'] ) )
     print_metadata(output['circuits_injections'])
     return output
 
