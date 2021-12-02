@@ -99,7 +99,7 @@ def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     answers_noise = []
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
         # Transpile the circuit for the noisy basis gates
-        tcirc = transpile(c, simulator)
+        tcirc = transpile(c, simulator, optimization_level=3)
         # Execute noisy simulation and get counts
         result_noise = simulator.run(tcirc).result()
         answer_noise = result_noise.get_counts(0)
@@ -144,7 +144,7 @@ def inject(circuit, name, backend):
 
     simulator = AerSimulator.from_backend(backend)
     # Transpile the circuit for the noisy basis gates
-    tcirc = transpile(circuit, simulator)
+    tcirc = transpile(circuit, simulator, optimization_level=3)
 
     angle_values = product(theta_values, phi_values)
     for angles in angle_values:
