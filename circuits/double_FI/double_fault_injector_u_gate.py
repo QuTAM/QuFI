@@ -1,6 +1,7 @@
 import numpy as np
 import pickle, gzip
 import copy
+import datetime
 from itertools import product
 
 # importing Qiskit
@@ -18,75 +19,15 @@ theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
 phi_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= phi <= pi
 #phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 
-def insert_second_gate(base_circuit, index, qubit, theta=0, phi=0, lam=0):
-    qregs = len(base_circuit.qubits)
-    cregs = len(base_circuit.clbits)
-    metadata = copy.deepcopy(base_circuit.metadata)
-    metadata['second_qubit'] = qubit.index
-    metadata['second_gate_index'] = index
-    metadata['second_theta'] = theta
-    metadata['second_phi'] = phi
-
-    mycircuit = QuantumCircuit(qregs, cregs, metadata=metadata)
-
-    for i in range(0, len(base_circuit.data)):
-        mycircuit.data.append(base_circuit.data[i])
-        if i == index:
-            # mycircuit.barrier(range(0, n+1))
-            mycircuit.u(theta, phi, lam, qubit)
-            # mycircuit.barrier(range(0, n+1))
-    return mycircuit
-
-def generate_second_fault_circuits_same_angle(base_circuit, theta=0, phi=0):
-    mycircuits = []
-    qregs = len(base_circuit.qubits)
-    cregs = len(base_circuit.clbits)
-
-    for i in range(0, len(base_circuit.data)):
-        gate = base_circuit.data[i][0]
-        qubits = base_circuit.data[i][1]
-
-        # Ignore barriers and measurement gates
-        if isinstance(gate, qiskit.circuit.measure.Measure) or isinstance(gate, qiskit.circuit.barrier.Barrier):
-            continue
-
-        # If gate are not using a single qubit, insert one gate after each qubit
-        for qb in qubits:
-            if qb.index != 1: 
-                mycircuits.append(insert_second_gate(base_circuit, i, qb, theta, phi))
-    
-    return mycircuits
-
-
-def generate_second_fault_circuits(base_circuit):
-    mycircuits = []
-    qregs = len(base_circuit.qubits)
-    cregs = len(base_circuit.clbits)
-
-    angle_values = product(theta_values, phi_values)
-
-    for angles in angle_values:
-        theta = angles[0]
-        phi = angles[1]
-        for i in range(0, len(base_circuit.data)):
-            gate = base_circuit.data[i][0]
-            qubits = base_circuit.data[i][1]
-
-            # Ignore barriers and measurement gates
-            if isinstance(gate, qiskit.circuit.measure.Measure) or isinstance(gate, qiskit.circuit.barrier.Barrier):
-                continue
-
-            # If gate are not using a single qubit, insert one gate after each qubit
-            for qb in qubits:
-                if qb.index != 1: 
-                    mycircuits.append(insert_second_gate(base_circuit, i, qb, theta, phi))
-    
-    return mycircuits
 
 def insert_gate(base_circuit, index, qubit, theta=0, phi=0, lam=0):
     qregs = len(base_circuit.qubits)
     cregs = len(base_circuit.clbits)
-    metadata = {'qubit':qubit.index, 'gate_index':index, 'gate_inserted':'u', 'theta':theta, 'phi':phi}
+    if base_circuit.metadata is None:
+        metadata = {'first_qubit':qubit.index, 'first_gate_index':index, 'gate_inserted':'u', 'first_theta':theta, 'first_phi':phi}
+    else:
+        metadata = copy.deepcopy(base_circuit.metadata)
+        metadata.update({'second_qubit':qubit.index, 'second_gate_index':index, 'second_theta':theta, 'second_phi':phi})
     mycircuit = QuantumCircuit(qregs, cregs, metadata=metadata)
 
     for i in range(0, len(base_circuit.data)):
@@ -98,7 +39,8 @@ def insert_gate(base_circuit, index, qubit, theta=0, phi=0, lam=0):
     return mycircuit
 
 def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0, lam=0):
-    qubit_couples = backend.configuration().to_dict()['coupling_map'] #actual physical neighboring qubits
+    qubit_couples = list(set(tuple(sorted(l)) for l in backend.configuration().to_dict()['coupling_map'])) # to avoid duplicates?
+    #qubit_couples = backend.configuration().to_dict()['coupling_map'] #actual physical neighboring qubits
     mapping = transpiled_circuit._layout.get_virtual_bits()  #from logical to physical qubits
     mapping_inv = transpiled_circuit._layout.get_physical_bits()  #from physical to logical qubits
 
@@ -125,9 +67,6 @@ def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0,
                 for second_theta, second_phi in product(np.arange(0, theta+0.01, np.pi/12), np.arange(0, phi+0.01, np.pi/12)):
                     mycircuits.append(insert_gate(single_fault_circuit, i, mapping_inv[neighbor], second_theta, second_phi, lam))
 
-            #if qb.index == 1: # insert faults only on qubit 1, second faults will be on qubits 0 and 2
-                #circuits_double_fault = generate_second_fault_circuits_same_angle(insert_gate(base_circuit, i, qb, theta, phi, lam), theta, phi)
-                #mycircuits.extend(circuits_double_fault)
 
     print('{} circuits generated for theta {} and phi {}'.format(len(mycircuits), theta, phi))
     return mycircuits
@@ -142,8 +81,9 @@ def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     answer_gold = results_gold.get_counts()
     
     
+    simulator = AerSimulator.from_backend(backend)
     # Execute noisy simulation and get counts
-    result_noise = sim_santiago.run(transpiled_circuit).result()
+    result_noise = simulator.run(transpiled_circuit).result()
     answer_gold_noise = result_noise.get_counts(0)
 
     answers = []
@@ -157,15 +97,15 @@ def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     answers_noise = []
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
         # Transpile the circuit for the noisy basis gates
-        tcirc = transpile(c, sim_santiago)
+        tcirc = transpile(c, simulator)
         # Execute noisy simulation and get counts
-        result_noise = sim_santiago.run(tcirc).result()
+        result_noise = simulator.run(tcirc).result()
         answer_noise = result_noise.get_counts(0)
         answers_noise.append(answer_noise)
 
     return {'output_gold':answer_gold, 'output_injections':answers
             , 'output_gold_noise':answer_gold_noise, 'output_injections_noise':answers_noise
-            , 'noise_target':str(device_backend)
+            , 'noise_target':str(backend)
             }
 
 
@@ -198,16 +138,12 @@ def inject(circuit, name, backend):
     print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit}
     output['qiskit_version'] = qiskit.__qiskit_version__
-    #output['circuits_injections'] = generate_circuits(circuit, theta, phi, lam)
-    #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     output['circuits_injections'] = []
 
     simulator = AerSimulator.from_backend(backend)
     # Transpile the circuit for the noisy basis gates
     tcirc = transpile(circuit, simulator)
 
-    #theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
-    #phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
     angle_values = product(theta_values, phi_values)
     for angles in angle_values:
         theta = angles[0]
@@ -215,11 +151,21 @@ def inject(circuit, name, backend):
         generated_circuits = generate_circuits(circuit, backend, tcirc, theta, phi)
         output['circuits_injections'].extend(generated_circuits)
     print('{} total circuits generated'.format(len(output['circuits_injections'])))
-    output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'] ) )
-    print_metadata(output['circuits_injections'])
+    print('running:',datetime.datetime.now())
+    #output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'], backend ) )
+    #output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'][:1000], backend ) ) # test how long it takes to run one thousand circuits
+    print('done:',datetime.datetime.now())
+    print_metadata(output['circuits_injections'][:200])
+    check_metadata(output['circuits_injections'])
     return output
 
 
 def print_metadata(circuits):
     for circ in circuits:
-        print(circ.metadata)
+        print(circ.metadata['first_qubit'],circ.metadata['second_qubit'])
+
+def check_metadata(circuits):
+    for circ in circuits:
+        if circ.metadata['first_qubit'] == circ.metadata['second_qubit']:
+            print('\n\tfound qubit pair using the same qubit!!!')
+            print(circ.metadata['first_qubit'],circ.metadata['second_qubit'])
