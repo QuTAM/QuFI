@@ -39,8 +39,8 @@ def insert_gate(base_circuit, index, qubit, theta=0, phi=0, lam=0):
     return mycircuit
 
 def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0, lam=0):
-    qubit_couples = list(set(tuple(sorted(l)) for l in backend.configuration().to_dict()['coupling_map'])) # to avoid duplicates?
-    #qubit_couples = backend.configuration().to_dict()['coupling_map'] #actual physical neighboring qubits
+    # qubit_couples = list(set(tuple(sorted(l)) for l in backend.configuration().to_dict()['coupling_map'])) # to avoid duplicates?
+    qubit_couples = backend.configuration().to_dict()['coupling_map'] #actual physical neighboring qubits
     mapping = transpiled_circuit._layout.get_virtual_bits()  #from logical to physical qubits
     mapping_inv = transpiled_circuit._layout.get_physical_bits()  #from physical to logical qubits
 
@@ -64,6 +64,8 @@ def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0,
             single_fault_circuit = insert_gate(base_circuit, i, logical_qb, theta, phi, lam)
 
             for neighbor in neighbors_qubits:
+                if mapping_inv[neighbor] not in base_circuit.qubits:
+                    continue
                 for second_theta, second_phi in product(np.arange(0, theta+0.01, np.pi/12), np.arange(0, phi+0.01, np.pi/12)):
                     mycircuits.append(insert_gate(single_fault_circuit, i, mapping_inv[neighbor], second_theta, second_phi, lam))
 
