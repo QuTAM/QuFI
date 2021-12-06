@@ -73,6 +73,14 @@ def generate_circuits(base_circuit, backend, transpiled_circuit, theta=0, phi=0,
     print('{} circuits generated for theta {} and phi {}'.format(len(mycircuits), theta, phi))
     return mycircuits
 
+def showPercentage(what, so_far, size):
+    so_far += 1
+    sys.stdout.write(
+               "\r%s  %s / %s  (%.2f%%)" % (
+                    what, so_far, size,
+                    so_far/size*100))
+    sys.stdout.flush()
+
 def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     print('running circuits')
     aer_sim = Aer.get_backend('qasm_simulator')
@@ -89,15 +97,17 @@ def run_circuits(base_circuit, transpiled_circuit, generated_circuits, backend):
     answer_gold_noise = result_noise.get_counts(0)
 
     answers = []
-    for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
-        #print("running circuit i={}".format(i))
-        qobj = assemble(c)
-        results = aer_sim.run(qobj).result()
-        answer = results.get_counts()
-        answers.append(answer)
+    #for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+    #    #print("running circuit i={}".format(i))
+    #    qobj = assemble(c)
+    #    results = aer_sim.run(qobj).result()
+    #    answer = results.get_counts()
+    #    answers.append(answer)
 
     answers_noise = []
+    totalCirc = len(generated_circuits)
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+        showPercentage("Executing circuits with noise", i, totalCirc)
         # Transpile the circuit for the noisy basis gates
         tcirc = transpile(c, simulator, optimization_level=3)
         # Execute noisy simulation and get counts
@@ -154,7 +164,7 @@ def inject(circuit, name, backend):
         output['circuits_injections'].extend(generated_circuits)
     print('{} total circuits generated'.format(len(output['circuits_injections'])))
     print('running:',datetime.datetime.now())
-    #output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'], backend ) )
+    output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'], backend ) )
     #output.update(run_circuits( output['base_circuit'], tcirc, output['circuits_injections'][:1000], backend ) ) # test how long it takes to run one thousand circuits
     print('done:',datetime.datetime.now())
     print_metadata(output['circuits_injections'][:200])
