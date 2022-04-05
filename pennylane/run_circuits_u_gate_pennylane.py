@@ -8,7 +8,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 #from qiskit.tools.jupyter import *
 #from qiskit.visualization import *
 
-from fault_injector_u_gate import inject
+from fault_injector_u_gate_pennylane import inject
 
 
 fp=open("./run_circuits_u_gate_logging.txt", "a")
@@ -47,7 +47,7 @@ circuits = []
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
-import inverseQFT
+import inverseQFT_pennylane as inverseQFT
 qft4 = inverseQFT.build_circuit(4)
 circuits.append( (qft4, 'inverseQFT4') )
 qft5 = inverseQFT.build_circuit(5)
@@ -57,7 +57,24 @@ circuits.append( (qft6, 'inverseQFT6') )
 qft7 = inverseQFT.build_circuit(7)
 circuits.append( (qft7, 'inverseQFT7') )
 
+#%%
+import pennylane as qml
 
+#%%
+
+for qiskit_circuit in circuits:
+    qregs = len(qiskit_circuit[0].qubits)
+    cregs = len(qiskit_circuit[0].clbits)
+    pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
+
+    device = qml.device("default.qubit", wires=qregs)
+    @qml.qnode(device)
+    def conv_circuit():
+        pl_circuit(wires=range(qregs))
+        return qml.expval(qml.PauliZ(0))
+    
+    print(qml.draw(conv_circuit)())
+    
 
 #%%
 theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi

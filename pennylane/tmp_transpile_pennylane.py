@@ -14,14 +14,14 @@ from qiskit.dagcircuit import DAGCircuit
 from qiskit.converters import circuit_to_dag
 from qiskit.visualization import dag_drawer
 
-from fault_injector_u_gate import inject
+from fault_injector_u_gate_pennylane import inject
 
 
 #%%
 circuits = []
 
-import Grover
-grover = Grover.build_circuit()
+import Grover_pennylane
+grover = Grover_pennylane.build_circuit()
 # circuits.append( (grover, 'Grover') )
 
 # provider = IBMQ.load_account()
