@@ -1,4 +1,5 @@
 #%%
+from email.mime import base
 import numpy as np
 from itertools import product
 import pickle, gzip
@@ -8,7 +9,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 #from qiskit.tools.jupyter import *
 #from qiskit.visualization import *
 
-from fault_injector_u_gate_pennylane import inject
+from fault_injector_u_gate_pennylane import inject, insert_gate
 
 
 fp=open("./run_circuits_u_gate_logging.txt", "a")
@@ -62,6 +63,8 @@ import pennylane as qml
 
 #%%
 
+conv_circuits = []
+
 for qiskit_circuit in circuits:
     qregs = len(qiskit_circuit[0].qubits)
     cregs = len(qiskit_circuit[0].clbits)
@@ -71,16 +74,51 @@ for qiskit_circuit in circuits:
     @qml.qnode(device)
     def conv_circuit():
         pl_circuit(wires=range(qregs))
-        return qml.expval(qml.PauliZ(0))
+        return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
     
-    print(qml.draw(conv_circuit)())
+    #print(qml.draw(conv_circuit)())
+    conv_circuits.append((conv_circuit, qiskit_circuit[1]))
+
+print(conv_circuits)
     
 
 #%%
-theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
-phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
+@qml.qfunc_transform
+def pl_insert_gate(tape, operator, theta, phi, lam):
+    for gate in tape.operations + tape.measurements:
+            # Ignore barriers and measurement gates
+            if gate.hash == operator.hash:
+                # If gate are not using a single qubit, insert one gate after each qubit
+                qml.apply(gate)
+                qml.U3(theta=theta, phi=phi, delta=lam, wires=gate.wires)
+
+def pl_generate_circuits(base_circuit, theta=0, phi=0, lam=0):
+    mycircuits = []
+    with base_circuit.tape as tape:
+        for op in tape.operations + tape.measurements:
+            transformed_circuit = pl_insert_gate(tape, op, theta, phi, lam)
+            device = qml.device('default.qubit', wires=len(tape.wires))
+            transformed_qnode = qml.QNode(transformed_circuit, device)
+            print(qml.draw(transformed_qnode)())
+            mycircuits.append(transformed_qnode)
+        print('{} circuits generated'.format(len(mycircuits)))
+        return mycircuits
+
+def pl_inject(circuit, name, theta=0, phi=0, lam=0):
+    print('running {}'.format(name))
+    output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
+    output['pennylane_version'] = qml.version
+    print(qml.draw(circuit)())
+    output['circuits_injections'] = pl_generate_circuits(circuit, theta, phi, lam)
+    #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
+    return output
+
+
+#%%
+theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
+phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
-for circ in circuits:
+for circuit in conv_circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
@@ -93,11 +131,11 @@ for circ in circuits:
         print('-'*80)
         fp.write('-'*80)
         fp.write('\n')
-        print('circuit:',circ[1], 'theta:',angles[0], 'phi:',angles[1])
-        fp.write('circuit: '+str(circ[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
+        print('circuit:',circuit[1], 'theta:',angles[0], 'phi:',angles[1])
+        fp.write('circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
-        r = inject(circ[0], circ[1], theta=angles[0], phi=angles[1])
+        r = pl_inject(circuit[0], circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
     print('done:',datetime.datetime.now())
     fp.write('done:'+str(datetime.datetime.now()))
@@ -105,6 +143,10 @@ for circ in circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
+
+#%%
+print()
+
 #%%
 filename_output = '../results/u_gate_15degrees_step_qft_4_5_6_7.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
