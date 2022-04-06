@@ -86,21 +86,23 @@ print(conv_circuits)
 @qml.qfunc_transform
 def pl_insert_gate(tape, operator, theta, phi, lam):
     for gate in tape.operations + tape.measurements:
-            # Ignore barriers and measurement gates
-            if gate.hash == operator.hash:
-                # If gate are not using a single qubit, insert one gate after each qubit
-                qml.apply(gate)
-                qml.U3(theta=theta, phi=phi, delta=lam, wires=gate.wires)
-            else:
-                qml.apply(gate)
+        # Ignore barriers and measurement gates
+        if gate.hash == operator.hash:
+            # If gate are not using a single qubit, insert one gate after each qubit
+            qml.apply(gate)
+            for wire in gate.wires:
+                qml.U3(theta=theta, phi=phi, delta=lam, wires=wire, id="FAULT")
+        else:
+            qml.apply(gate)
 
-def pl_generate_circuits(base_circuit, theta=0, phi=0, lam=0):
+def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
     with base_circuit.tape as tape:
         for op in tape.operations:
-            transformed_circuit = pl_insert_gate(op, theta, phi, lam)(tape)
+            transformed_circuit = pl_insert_gate(op, theta, phi, lam)(base_circuit.func)
             device = qml.device('default.qubit', wires=len(tape.wires))
             transformed_qnode = qml.QNode(transformed_circuit, device)
+            print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
             print(qml.draw(transformed_qnode)())
             mycircuits.append(transformed_qnode)
         print('{} circuits generated'.format(len(mycircuits)))
@@ -111,7 +113,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
     output['pennylane_version'] = qml.version
     print(qml.draw(circuit)())
-    output['circuits_injections'] = pl_generate_circuits(circuit, theta, phi, lam)
+    output['circuits_injections'] = pl_generate_circuits(circuit, name, theta, phi, lam)
     #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     return output
 
@@ -133,7 +135,8 @@ for circuit in conv_circuits:
         print('-'*80)
         fp.write('-'*80)
         fp.write('\n')
-        print('circuit:',circuit[1], 'theta:',angles[0], 'phi:',angles[1])
+        print("\n")
+        print('circuit:', circuit[1], 'theta:', angles[0], 'phi:', angles[1])
         fp.write('circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
