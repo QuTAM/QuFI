@@ -91,12 +91,14 @@ def pl_insert_gate(tape, operator, theta, phi, lam):
                 # If gate are not using a single qubit, insert one gate after each qubit
                 qml.apply(gate)
                 qml.U3(theta=theta, phi=phi, delta=lam, wires=gate.wires)
+            else:
+                qml.apply(gate)
 
 def pl_generate_circuits(base_circuit, theta=0, phi=0, lam=0):
     mycircuits = []
     with base_circuit.tape as tape:
-        for op in tape.operations + tape.measurements:
-            transformed_circuit = pl_insert_gate(tape, op, theta, phi, lam)
+        for op in tape.operations:
+            transformed_circuit = pl_insert_gate(op, theta, phi, lam)(tape)
             device = qml.device('default.qubit', wires=len(tape.wires))
             transformed_qnode = qml.QNode(transformed_circuit, device)
             print(qml.draw(transformed_qnode)())
