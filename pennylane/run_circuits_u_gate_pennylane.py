@@ -8,6 +8,8 @@ import datetime
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile, Aer, IBMQ, execute
 #from qiskit.tools.jupyter import *
 #from qiskit.visualization import *
+from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
+from qiskit.providers.aer.noise import NoiseModel
 
 from fault_injector_u_gate_pennylane import inject, insert_gate
 
@@ -60,34 +62,38 @@ circuits.append( (qft7, 'inverseQFT7') )
 
 #%%
 import pennylane as qml
-    
+
 
 #%%
 def run_circuits(base_circuit, generated_circuits):
+    # Execute golden circuit simulation without noise
     print('running circuits')
-    #print("running base circuit")
-    answer_gold = base_circuit()
-    device_backend = "FakeSantiago"
-    
-    # Execute noisy simulation and get counts
-    #result_noise = sim_santiago.run(tcirc).result()
-    answer_gold_noise = None
-    answers_noise = None
+    gold_device = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='qasm_simulator')
+    gold_qnode = qml.QNode(base_circuit.func, gold_device)
+    answer_gold = gold_qnode()
 
+    # Execute golden circuit simulation with noise
+    device_backend = FakeSantiago()
+    noise_model = NoiseModel.from_backend(device_backend)
+    gold_device_noisy = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='aer_simulator', noise_model=noise_model)
+    gold_qnode_noisy = qml.QNode(base_circuit.func, gold_device_noisy)
+    answer_gold_noise = gold_qnode_noisy()
+
+    # Execute injection circuit simulations without noise
     answers = []
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
-        #print("running circuit i={}".format(i))
-        answer = c()
+        inj_device = qml.device('qiskit.aer', wires=c.device.num_wires, backend='qasm_simulator')
+        inj_qnode = qml.QNode(c.func, inj_device)
+        answer = inj_qnode()
         answers.append(answer)
 
-    #answers_noise = []
-    #for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
-    #    # Transpile the circuit for the noisy basis gates
-    #    tcirc = transpile(c, sim_santiago)
-    #    # Execute noisy simulation and get counts
-    #    result_noise = sim_santiago.run(tcirc).result()
-    #    answer_noise = result_noise.get_counts(0)
-    #    answers_noise.append(answer_noise)
+    # Execute injection circuit simulations with noise
+    answers_noise = []
+    for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+        inj_device_noisy = qml.device('qiskit.aer', wires=c.device.num_wires, backend='aer_simulator', noise_model=noise_model)
+        inj_qnode_noisy = qml.QNode(c.func, inj_device_noisy)
+        answer_noise = inj_qnode_noisy()
+        answers_noise.append(answer_noise)
 
     print(answer_gold)
     print(answers)
