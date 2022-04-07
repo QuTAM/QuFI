@@ -60,29 +60,56 @@ circuits.append( (qft7, 'inverseQFT7') )
 
 #%%
 import pennylane as qml
+    
 
 #%%
+def run_circuits(base_circuit, generated_circuits):
+    print('running circuits')
+    #print("running base circuit")
+    answer_gold = base_circuit()
+    device_backend = "FakeSantiago"
+    
+    # Execute noisy simulation and get counts
+    #result_noise = sim_santiago.run(tcirc).result()
+    answer_gold_noise = None
+    answers_noise = None
 
-conv_circuits = []
+    answers = []
+    for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+        #print("running circuit i={}".format(i))
+        answer = c()
+        answers.append(answer)
 
-for qiskit_circuit in circuits:
+    #answers_noise = []
+    #for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+    #    # Transpile the circuit for the noisy basis gates
+    #    tcirc = transpile(c, sim_santiago)
+    #    # Execute noisy simulation and get counts
+    #    result_noise = sim_santiago.run(tcirc).result()
+    #    answer_noise = result_noise.get_counts(0)
+    #    answers_noise.append(answer_noise)
+
+    print(answer_gold)
+    print(answers)
+
+    return {'output_gold':answer_gold, 'output_injections':answers
+            , 'output_gold_noise':answer_gold_noise, 'output_injections_noise':answers_noise
+            , 'noise_target':str(device_backend)
+            }
+
+#%%
+def convert_circuit(qiskit_circuit):
+    shots = 1024
     qregs = len(qiskit_circuit[0].qubits)
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
-
-    #device = qml.device("default.qubit", wires=qregs)
-    #@qml.qnode(device)
-    #def conv_circuit():
-    #    pl_circuit(wires=range(qregs))
-    #    return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
-    #conv_circuit = qml.QNode(pl_circuit, device)
-    
+    device = qml.device("default.qubit", wires=qregs, shots=shots)
+    @qml.qnode(device)
+    def conv_circuit():
+        pl_circuit(wires=range(qregs))
+        return qml.probs(wires=range(qregs)) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
     #print(qml.draw(conv_circuit)())
-    conv_circuits.append((pl_circuit, qiskit_circuit[1]))
+    return conv_circuit
 
-print(conv_circuits)
-    
-
-#%%
 @qml.qfunc_transform
 def pl_insert_gate(tape, operator, theta, phi, lam):
     for gate in tape.operations + tape.measurements:
@@ -99,11 +126,12 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
     with base_circuit.tape as tape:
         for op in tape.operations:
+            shots = 1024
             transformed_circuit = pl_insert_gate(op, theta, phi, lam)(base_circuit.func)
-            device = qml.device('default.qubit', wires=len(tape.wires))
+            device = qml.device('default.qubit', wires=len(tape.wires), shots=shots)
             transformed_qnode = qml.QNode(transformed_circuit, device)
             print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
-            print(qml.draw(transformed_qnode)())
+            #print(qml.draw(transformed_qnode)())
             mycircuits.append(transformed_qnode)
         print('{} circuits generated'.format(len(mycircuits)))
         return mycircuits
@@ -114,24 +142,15 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     output['pennylane_version'] = qml.version
     print(qml.draw(circuit)())
     output['circuits_injections'] = pl_generate_circuits(circuit, name, theta, phi, lam)
-    #output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
+    output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     return output
-
 
 #%%
 theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
 phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
 for qiskit_circuit in circuits:
-
-    qregs = len(qiskit_circuit[0].qubits)
-    pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
-    device = qml.device("default.qubit", wires=qregs)
-    @qml.qnode(device)
-    def conv_circuit():
-        pl_circuit(wires=range(qregs))
-        return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
-    print(qml.draw(conv_circuit)())
+    conv_circuit = convert_circuit(qiskit_circuit)
 
     print('-'*80)
     fp.write('-'*80)
@@ -159,8 +178,6 @@ for qiskit_circuit in circuits:
     fp.write('-'*80)
     fp.write('\n')
 
-#%%
-print()
 
 #%%
 filename_output = '../results/u_gate_15degrees_step_qft_4_5_6_7.p.gz'
@@ -169,3 +186,5 @@ print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
 fp.close()
 
+
+# %%
