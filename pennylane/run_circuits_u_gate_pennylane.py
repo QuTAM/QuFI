@@ -11,6 +11,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 #from qiskit.visualization import *
 from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
 from qiskit.providers.aer.noise import NoiseModel
+import pennylane as qml
 
 from fault_injector_u_gate_pennylane import inject, insert_gate
 
@@ -60,9 +61,6 @@ qft6 = inverseQFT.build_circuit(6)
 circuits.append( (qft6, 'inverseQFT6') )
 qft7 = inverseQFT.build_circuit(7)
 circuits.append( (qft7, 'inverseQFT7') )
-
-#%%
-import pennylane as qml
 
 
 #%%
@@ -125,7 +123,8 @@ def convert_circuit(qiskit_circuit):
     def conv_circuit():
         pl_circuit(wires=range(qregs))
         return qml.probs(wires=range(qregs)) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
-    #print(qml.draw(conv_circuit)())
+    # Do NOT remove this print, else the qnode can't bind the function before exiting convert_circuit()'s context
+    print(qml.draw(conv_circuit)())
     return conv_circuit
 
 @qml.qfunc_transform
@@ -157,10 +156,14 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
 def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
-    output['pennylane_version'] = qml.version
+    output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
     output['circuits_injections'] = pl_generate_circuits(circuit, name, theta, phi, lam)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
+    # Remove all qnodes from the output dict since pickle can't process them (they are functions)
+    # "Then he turned himself into a pickle, funniest shit I've ever seen!"
+    output['base_circuit'] = None
+    output['circuits_injections'] = None
     return output
 
 #%%
@@ -199,6 +202,7 @@ for qiskit_circuit in circuits:
 #%%
 # Careful! Very verbose
 print(results)
+
 
 #%%
 filename_output = f'../results/u_gate_15degrees_step_qft_4_5_6_7_pennylane.p.gz'
