@@ -67,17 +67,17 @@ conv_circuits = []
 
 for qiskit_circuit in circuits:
     qregs = len(qiskit_circuit[0].qubits)
-    cregs = len(qiskit_circuit[0].clbits)
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
 
-    device = qml.device("default.qubit", wires=qregs)
-    @qml.qnode(device)
-    def conv_circuit():
-        pl_circuit(wires=range(qregs))
-        return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
+    #device = qml.device("default.qubit", wires=qregs)
+    #@qml.qnode(device)
+    #def conv_circuit():
+    #    pl_circuit(wires=range(qregs))
+    #    return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
+    #conv_circuit = qml.QNode(pl_circuit, device)
     
     #print(qml.draw(conv_circuit)())
-    conv_circuits.append((conv_circuit, qiskit_circuit[1]))
+    conv_circuits.append((pl_circuit, qiskit_circuit[1]))
 
 print(conv_circuits)
     
@@ -122,7 +122,17 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
 theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
 phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
-for circuit in conv_circuits:
+for qiskit_circuit in circuits:
+
+    qregs = len(qiskit_circuit[0].qubits)
+    pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
+    device = qml.device("default.qubit", wires=qregs)
+    @qml.qnode(device)
+    def conv_circuit():
+        pl_circuit(wires=range(qregs))
+        return [qml.expval(qml.PauliZ(i)) for i in range(qregs)]
+    print(qml.draw(conv_circuit)())
+
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
@@ -136,11 +146,11 @@ for circuit in conv_circuits:
         fp.write('-'*80)
         fp.write('\n')
         print("\n")
-        print('circuit:', circuit[1], 'theta:', angles[0], 'phi:', angles[1])
-        fp.write('circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
+        print('circuit:', qiskit_circuit[1], 'theta:', angles[0], 'phi:', angles[1])
+        fp.write('circuit: '+str(qiskit_circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
-        r = pl_inject(circuit[0], circuit[1], theta=angles[0], phi=angles[1])
+        r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
     print('done:',datetime.datetime.now())
     fp.write('done:'+str(datetime.datetime.now()))
