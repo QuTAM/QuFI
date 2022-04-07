@@ -4,6 +4,7 @@ import numpy as np
 from itertools import product
 import pickle, gzip
 import datetime
+from math import ceil
 # Importing standard Qiskit libraries
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile, Aer, IBMQ, execute
 #from qiskit.tools.jupyter import *
@@ -65,26 +66,40 @@ import pennylane as qml
 
 
 #%%
+def probs_to_counts(probs, nwires):
+    res_dict = {}
+    shots = 1024
+    for p, t in zip(probs, list(product(['0', '1'], repeat=nwires))):
+        b = ''.join(t)
+        count = int(ceil(shots*float(p)))
+        if count != 0:
+            res_dict[b] = count
+    # debug check for ceil rounding
+    if sum(res_dict.values()) != shots:
+        print(sum(res_dict.values()), shots)
+        a = input()
+    return res_dict
+
 def run_circuits(base_circuit, generated_circuits):
     # Execute golden circuit simulation without noise
     print('running circuits')
     gold_device = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='qasm_simulator')
     gold_qnode = qml.QNode(base_circuit.func, gold_device)
-    answer_gold = gold_qnode()
+    answer_gold = probs_to_counts(gold_qnode(), base_circuit.device.num_wires)
 
     # Execute golden circuit simulation with noise
     device_backend = FakeSantiago()
     noise_model = NoiseModel.from_backend(device_backend)
     gold_device_noisy = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='aer_simulator', noise_model=noise_model)
     gold_qnode_noisy = qml.QNode(base_circuit.func, gold_device_noisy)
-    answer_gold_noise = gold_qnode_noisy()
+    answer_gold_noise = probs_to_counts(gold_qnode_noisy(), base_circuit.device.num_wires)
 
     # Execute injection circuit simulations without noise
     answers = []
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
         inj_device = qml.device('qiskit.aer', wires=c.device.num_wires, backend='qasm_simulator')
         inj_qnode = qml.QNode(c.func, inj_device)
-        answer = inj_qnode()
+        answer = probs_to_counts(inj_qnode(), base_circuit.device.num_wires)
         answers.append(answer)
 
     # Execute injection circuit simulations with noise
@@ -92,11 +107,8 @@ def run_circuits(base_circuit, generated_circuits):
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
         inj_device_noisy = qml.device('qiskit.aer', wires=c.device.num_wires, backend='aer_simulator', noise_model=noise_model)
         inj_qnode_noisy = qml.QNode(c.func, inj_device_noisy)
-        answer_noise = inj_qnode_noisy()
+        answer_noise = probs_to_counts(inj_qnode_noisy(), base_circuit.device.num_wires)
         answers_noise.append(answer_noise)
-
-    print(answer_gold)
-    print(answers)
 
     return {'output_gold':answer_gold, 'output_injections':answers
             , 'output_gold_noise':answer_gold_noise, 'output_injections_noise':answers_noise
@@ -146,7 +158,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
     output['pennylane_version'] = qml.version
-    print(qml.draw(circuit)())
+    #print(qml.draw(circuit)())
     output['circuits_injections'] = pl_generate_circuits(circuit, name, theta, phi, lam)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     return output
@@ -184,9 +196,12 @@ for qiskit_circuit in circuits:
     fp.write('-'*80)
     fp.write('\n')
 
+#%%
+# Careful! Very verbose
+print(results)
 
 #%%
-filename_output = '../results/u_gate_15degrees_step_qft_4_5_6_7.p.gz'
+filename_output = f'../results/u_gate_15degrees_step_qft_4_5_6_7_pennylane.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))

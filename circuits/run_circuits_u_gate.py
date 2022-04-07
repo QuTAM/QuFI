@@ -60,8 +60,8 @@ circuits.append( (qft7, 'inverseQFT7') )
 
 
 #%%
-theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
-phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
+theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
+phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
 for circ in circuits:
     print('-'*80)
@@ -88,6 +88,8 @@ for circ in circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
+
+print(results)
 #%%
 filename_output = '../results/u_gate_15degrees_step_qft_4_5_6_7.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
