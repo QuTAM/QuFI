@@ -116,8 +116,7 @@ def run_circuits(base_circuit, generated_circuits):
 #%%
 def convert_circuit(qiskit_circuit):
     shots = 1024
-    measure_list = [g[1][1] for g in qiskit_circuit[0].data if g[0].name == 'measure']
-    print(measure_list)
+    measure_list = [g[1][0].index for g in qiskit_circuit[0].data if g[0].name == 'measure']
     qregs = qiskit_circuit[0].num_qubits
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
     device = qml.device("default.qubit", wires=qregs, shots=shots)
@@ -194,7 +193,7 @@ for qiskit_circuit in circuits:
         fp.write('circuit: '+str(qiskit_circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
-        #r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
+        r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
     print('done:',datetime.datetime.now())
     fp.write('done:'+str(datetime.datetime.now()))
