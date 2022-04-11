@@ -141,6 +141,7 @@ def pl_insert_gate(tape, operator, theta, phi, lam):
 
 def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
+    inj_info = []
     with base_circuit.tape as tape:
         for op in tape.operations:
             shots = 1024
@@ -150,20 +151,21 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
             print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
             #print(qml.draw(transformed_qnode)())
             mycircuits.append(transformed_qnode)
+            inj_info.append(op.wires)
         print('{} circuits generated'.format(len(mycircuits)))
-        return mycircuits
+        return mycircuits, inj_info
 
 def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
-    output['circuits_injections'] = pl_generate_circuits(circuit, name, theta, phi, lam)
+    output['circuits_injections'], wires = pl_generate_circuits(circuit, name, theta, phi, lam)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
     # "Then he turned himself into a pickle, funniest shit I've ever seen!"
     output['base_circuit'] = None
-    output['circuits_injections'] = None
+    output['circuits_injections'] = (wires, theta, phi)
     return output
 
 #%%
