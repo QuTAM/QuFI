@@ -116,13 +116,15 @@ def run_circuits(base_circuit, generated_circuits):
 #%%
 def convert_circuit(qiskit_circuit):
     shots = 1024
-    qregs = len(qiskit_circuit[0].qubits)
+    measure_list = [g[1][1] for g in qiskit_circuit[0].data if g[0].name == 'measure']
+    print(measure_list)
+    qregs = qiskit_circuit[0].num_qubits
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
     device = qml.device("default.qubit", wires=qregs, shots=shots)
     @qml.qnode(device)
     def conv_circuit():
         pl_circuit(wires=range(qregs))
-        return qml.probs(wires=range(qregs)) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
+        return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
     # Do NOT remove this print, else the qnode can't bind the function before exiting convert_circuit()'s context
     print(qml.draw(conv_circuit)())
     return conv_circuit
@@ -165,7 +167,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
     # "Then he turned himself into a pickle, funniest shit I've ever seen!"
     output['base_circuit'] = None
-    output['circuits_injections'] = (wires, theta, phi)
+    output['circuits_injections'] = wires
     return output
 
 #%%
@@ -192,7 +194,7 @@ for qiskit_circuit in circuits:
         fp.write('circuit: '+str(qiskit_circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
-        r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
+        #r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
     print('done:',datetime.datetime.now())
     fp.write('done:'+str(datetime.datetime.now()))
