@@ -25,9 +25,9 @@ circuits = []
 #grove = Grover.build_circuit()
 #circuits.append( (grove, 'Grover') )
 
-#import Bernstein_Vazirani_pennylane as Bernstein_Vazirani
-#bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
-#circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
+import Bernstein_Vazirani_pennylane as Bernstein_Vazirani
+bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
+circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 
 #bv_5 = Bernstein_Vazirani.build_circuit(4, '1010')
 #circuits.append( (bv_5, 'Bernstein-Vazirani_5') )
@@ -39,9 +39,9 @@ circuits = []
 #circuits.append( (bv_7, 'Bernstein-Vazirani_7') )
 
 
-import Deutsch_Jozsa_pennylane as Deutsch_Jozsa
-dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
-circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
+#import Deutsch_Jozsa_pennylane as Deutsch_Jozsa
+#dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
+#circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
 #
 #dj_5 = Deutsch_Jozsa.build_circuit(4, '1010')
 #circuits.append( (dj_5, 'Deutsch-Jozsa_5') )
@@ -129,30 +129,34 @@ def convert_circuit(qiskit_circuit):
     return conv_circuit
 
 @qml.qfunc_transform
-def pl_insert_gate(tape, operator, theta, phi, lam):
+def pl_insert_gate(tape, index, wire, theta, phi, lam):
+    i = 0
     for gate in tape.operations + tape.measurements:
         # Ignore barriers and measurement gates
-        if gate.hash == operator.hash:
+        if i == index:
             # If gate are not using a single qubit, insert one gate after each qubit
             qml.apply(gate)
-            for wire in gate.wires:
-                qml.U3(theta=theta, phi=phi, delta=lam, wires=wire, id="FAULT")
+            qml.U3(theta=theta, phi=phi, delta=lam, wires=wire, id="FAULT")
         else:
             qml.apply(gate)
+        i = i + 1
 
 def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
     inj_info = []
     with base_circuit.tape as tape:
+        index = 0
         for op in tape.operations:
-            shots = 1024
-            transformed_circuit = pl_insert_gate(op, theta, phi, lam)(base_circuit.func)
-            device = qml.device('default.qubit', wires=len(tape.wires), shots=shots)
-            transformed_qnode = qml.QNode(transformed_circuit, device)
-            print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
-            #print(qml.draw(transformed_qnode)())
-            mycircuits.append(transformed_qnode)
-            inj_info.append(op.wires)
+            for wire in op.wires:
+                shots = 1024
+                transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
+                device = qml.device('default.qubit', wires=len(tape.wires), shots=shots)
+                transformed_qnode = qml.QNode(transformed_circuit, device)
+                print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
+                #print(qml.draw(transformed_qnode)())
+                mycircuits.append(transformed_qnode)
+                inj_info.append(wire)
+            index = index + 1
         print('{} circuits generated'.format(len(mycircuits)))
         return mycircuits, inj_info
 
@@ -174,8 +178,6 @@ theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi
 phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
 results = []
 for qiskit_circuit in circuits:
-    conv_circuit = convert_circuit(qiskit_circuit)
-
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
@@ -185,6 +187,8 @@ for qiskit_circuit in circuits:
     fp.flush()
     angle_values = product(theta_values, phi_values)
     for angles in angle_values:
+        # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
+        conv_circuit = convert_circuit(qiskit_circuit)
         print('-'*80)
         fp.write('-'*80)
         fp.write('\n')
@@ -208,7 +212,7 @@ print(results)
 
 
 #%%
-filename_output = '../results/u_gate_15degrees_step_dj_4_pennylane.p.gz'
+filename_output = '../results/u_gate_15degrees_step_bv_4_pennylane.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
