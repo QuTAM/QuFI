@@ -25,9 +25,9 @@ circuits = []
 #grove = Grover.build_circuit()
 #circuits.append( (grove, 'Grover') )
 
-import Bernstein_Vazirani_pennylane as Bernstein_Vazirani
-bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
-circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
+#import Bernstein_Vazirani_pennylane as Bernstein_Vazirani
+#bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
+#circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 
 #bv_5 = Bernstein_Vazirani.build_circuit(4, '1010')
 #circuits.append( (bv_5, 'Bernstein-Vazirani_5') )
@@ -52,9 +52,9 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
-#import inverseQFT_pennylane as inverseQFT
-#qft4 = inverseQFT.build_circuit(4)
-#circuits.append( (qft4, 'inverseQFT4') )
+import inverseQFT_pennylane as inverseQFT
+qft4 = inverseQFT.build_circuit(4)
+circuits.append( (qft4, 'inverseQFT4') )
 #qft5 = inverseQFT.build_circuit(5)
 #circuits.append( (qft5, 'inverseQFT5') )
 #qft6 = inverseQFT.build_circuit(6)
@@ -174,8 +174,8 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 #%%
-theta_values = [0, np.pi/4, np.pi/2, np.pi*3/4, np.pi]#np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
-phi_values = [0, np.pi/2]#np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
+theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
+phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
 results = []
 for qiskit_circuit in circuits:
     print('-'*80)
@@ -216,7 +216,7 @@ print(results)
 
 
 #%%
-filename_output = '../results/u_gate_15degrees_step_bv_4_pennylane.p.gz'
+filename_output = '../results/u_gate_15degrees_step_qft_4_pennylane.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
