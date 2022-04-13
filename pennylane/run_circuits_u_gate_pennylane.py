@@ -13,6 +13,9 @@ from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
 from qiskit.providers.aer.noise import NoiseModel
 import pennylane as qml
 
+import sys
+sys.path.insert(0,'..')
+
 from fault_injector_u_gate_pennylane import inject, insert_gate
 
 
@@ -21,13 +24,13 @@ fp=open("./run_circuits_u_gate_logging.txt", "a")
 #%%
 circuits = []
 
-#import Grover
+#from circuits import Grover
 #grove = Grover.build_circuit()
 #circuits.append( (grove, 'Grover') )
 
-#import Bernstein_Vazirani_pennylane as Bernstein_Vazirani
-#bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
-#circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
+from circuits import Bernstein_Vazirani
+bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
+circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 
 #bv_5 = Bernstein_Vazirani.build_circuit(4, '1010')
 #circuits.append( (bv_5, 'Bernstein-Vazirani_5') )
@@ -39,7 +42,7 @@ circuits = []
 #circuits.append( (bv_7, 'Bernstein-Vazirani_7') )
 
 
-#import Deutsch_Jozsa_pennylane as Deutsch_Jozsa
+#from circuits import Deutsch_Jozsa
 #dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
 #circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
 #
@@ -52,9 +55,9 @@ circuits = []
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
-import inverseQFT_pennylane as inverseQFT
-qft4 = inverseQFT.build_circuit(4)
-circuits.append( (qft4, 'inverseQFT4') )
+#from circuits import inverseQFT
+#qft4 = inverseQFT.build_circuit(4)
+#circuits.append( (qft4, 'inverseQFT4') )
 #qft5 = inverseQFT.build_circuit(5)
 #circuits.append( (qft5, 'inverseQFT5') )
 #qft6 = inverseQFT.build_circuit(6)
@@ -74,8 +77,7 @@ def probs_to_counts(probs, nwires):
             res_dict[b] = count
     # debug check for ceil rounding
     if sum(res_dict.values()) != shots:
-        print(sum(res_dict.values()), shots)
-        a = input()
+        print("Rounding error! ", sum(res_dict.values()), shots)
     return res_dict
 
 def run_circuits(base_circuit, generated_circuits):
@@ -216,7 +218,7 @@ print(results)
 
 
 #%%
-filename_output = '../results/u_gate_15degrees_step_qft_4_pennylane.p.gz'
+filename_output = '../results/u_gate_15degrees_step_qft_4_pennylane_lightning.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
