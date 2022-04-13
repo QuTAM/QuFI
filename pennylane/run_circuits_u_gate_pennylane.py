@@ -119,7 +119,7 @@ def convert_circuit(qiskit_circuit):
     measure_list = [g[1][0].index for g in qiskit_circuit[0].data if g[0].name == 'measure']
     qregs = qiskit_circuit[0].num_qubits
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
-    device = qml.device("default.qubit", wires=qregs, shots=shots)
+    device = qml.device("lightning.qubit", wires=qregs, shots=shots)
     @qml.qnode(device)
     def conv_circuit():
         pl_circuit(wires=range(qregs))
@@ -150,7 +150,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
             for wire in op.wires:
                 shots = 1024
                 transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
-                device = qml.device('default.qubit', wires=len(tape.wires), shots=shots)
+                device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                 transformed_qnode = qml.QNode(transformed_circuit, device)
                 print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
                 #print(qml.draw(transformed_qnode)())
@@ -174,15 +174,16 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 #%%
-theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
-phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
+theta_values = [0, np.pi/4, np.pi/2, np.pi*3/4, np.pi]#np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
+phi_values = [0, np.pi/2]#np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
 results = []
 for qiskit_circuit in circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
-    print('start:',datetime.datetime.now())
-    fp.write('start:'+str(datetime.datetime.now()))
+    tstart = datetime.datetime.now()
+    print('start:',tstart)
+    fp.write('start:'+str(tstart))
     fp.write('\n')
     fp.flush()
     angle_values = product(theta_values, phi_values)
@@ -199,8 +200,11 @@ for qiskit_circuit in circuits:
         fp.flush()
         r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
-    print('done:',datetime.datetime.now())
-    fp.write('done:'+str(datetime.datetime.now()))
+    tend = datetime.datetime.now()
+    print('done:',tend)
+    fp.write('done:'+str(tend))
+    print('Elapsed time:',tend-tstart)
+    fp.write('Elapsed time:'+str(tend-tstart))
     fp.write('\n')
     print('-'*80)
     fp.write('-'*80)
