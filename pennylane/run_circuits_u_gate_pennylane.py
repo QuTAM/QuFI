@@ -12,27 +12,22 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
 from qiskit.providers.aer.noise import NoiseModel
 import pennylane as qml
-
 import sys
 sys.path.insert(0,'..')
 
-from fault_injector_u_gate_pennylane import inject, insert_gate
-
-
-fp=open("./run_circuits_u_gate_logging.txt", "a")
 
 #%%
 circuits = []
 
-################### Qiskit defined circuits ####################
+#################### Qiskit defined circuits ###################
 
 #from circuits import Grover
 #grove = Grover.build_circuit()
 #circuits.append( (grove, 'Grover') )
 
-from circuits import Bernstein_Vazirani
-bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
-circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
+#from circuits import Bernstein_Vazirani
+#bv_4 = Bernstein_Vazirani.build_circuit(3, '101')
+#circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 
 #bv_5 = Bernstein_Vazirani.build_circuit(4, '1010')
 #circuits.append( (bv_5, 'Bernstein-Vazirani_5') )
@@ -41,9 +36,9 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 #bv_7 = Bernstein_Vazirani.build_circuit(6, '101010')
 #circuits.append( (bv_7, 'Bernstein-Vazirani_7') )
 
-from circuits import Deutsch_Jozsa
-dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
-circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
+#from circuits import Deutsch_Jozsa
+#dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
+#circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
 #dj_5 = Deutsch_Jozsa.build_circuit(4, '1010')
 #circuits.append( (dj_5, 'Deutsch-Jozsa_5') )
 #dj_6 = Deutsch_Jozsa.build_circuit(5, '10101')
@@ -51,9 +46,9 @@ circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
-from circuits import inverseQFT
-qft4 = inverseQFT.build_circuit(4)
-circuits.append( (qft4, 'inverseQFT4') )
+#from circuits import inverseQFT
+#qft4 = inverseQFT.build_circuit(4)
+#circuits.append( (qft4, 'inverseQFT4') )
 #qft5 = inverseQFT.build_circuit(5)
 #circuits.append( (qft5, 'inverseQFT5') )
 #qft6 = inverseQFT.build_circuit(6)
@@ -61,31 +56,31 @@ circuits.append( (qft4, 'inverseQFT4') )
 #qft7 = inverseQFT.build_circuit(7)
 #circuits.append( (qft7, 'inverseQFT7') )
 
-################# Pennylane defined circuits ###################
+################## Pennylane defined circuits ##################
 
-import Grover_pennylane
-grover = Grover_pennylane.build_circuit()
-circuits.append( (grover, 'Grover') )
+#import Grover_pennylane
+#grover = Grover_pennylane.build_circuit()
+#circuits.append( (grover, 'Grover') )
 
-#import Bernstein_Vazirani_pennylane
-#bv4_p = Bernstein_Vazirani_pennylane.build_circuit(3, '101')
-#circuits.append(bv4_p, 'Bernstein-Vazirani_4')
+import Bernstein_Vazirani_pennylane
+bv4_p = Bernstein_Vazirani_pennylane.build_circuit(3, '101')
+circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 #bv5_p = Bernstein_Vazirani_pennylane.build_circuit(4, '1010')
-#circuits.append(bv5_p, 'Bernstein-Vazirani_5')
+#circuits.append((bv5_p, 'Bernstein-Vazirani_5'))
 #bv6_p = Bernstein_Vazirani_pennylane.build_circuit(5, '10101')
-#circuits.append(bv6_p, 'Bernstein-Vazirani_6')
+#circuits.append((bv6_p, 'Bernstein-Vazirani_6'))
 #bv7_p = Bernstein_Vazirani_pennylane.build_circuit(6, '101010')
-#circuits.append(bv7_p, 'Bernstein-Vazirani_7')
+#circuits.append((bv7_p, 'Bernstein-Vazirani_7'))
 
 #import Deutsch_Jozsa_pennylane
 #dj_4_p = Deutsch_Jozsa_pennylane.build_circuit(3, '101')
-#circuits.append(dj_4_p, 'Deutsch-Jozsa_4')
+#circuits.append((dj_4_p, 'Deutsch-Jozsa_4'))
 #dj_5_p = Deutsch_Jozsa_pennylane.build_circuit(4, '1010')
-#circuits.append(dj_5_p, 'Deutsch-Jozsa_5')
+#circuits.append((dj_5_p, 'Deutsch-Jozsa_5'))
 #dj_6_p = Deutsch_Jozsa_pennylane.build_circuit(5, '10101')
-#circuits.append(dj_6_p, 'Deutsch-Jozsa_6')
+#circuits.append((dj_6_p, 'Deutsch-Jozsa_6'))
 #dj_7_p = Deutsch_Jozsa_pennylane.build_circuit(6, '101010')
-#circuits.append(dj_7_p, 'Deutsch-Jozsa_7')
+#circuits.append((dj_7_p, 'Deutsch-Jozsa_7'))
 
 #import inverseQFT_pennylane
 #iqft4_p = inverseQFT_pennylane.build_circuit(4)
@@ -114,7 +109,7 @@ def probs_to_counts(probs, nwires):
 def run_circuits(base_circuit, generated_circuits):
     # Execute golden circuit simulation without noise
     print('running circuits')
-    gold_device = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='qasm_simulator')
+    gold_device = qml.device('lightning.qubit', wires=base_circuit.device.num_wires)
     gold_qnode = qml.QNode(base_circuit.func, gold_device)
     answer_gold = probs_to_counts(gold_qnode(), base_circuit.device.num_wires)
 
@@ -128,7 +123,7 @@ def run_circuits(base_circuit, generated_circuits):
     # Execute injection circuit simulations without noise
     answers = []
     for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
-        inj_device = qml.device('qiskit.aer', wires=c.device.num_wires, backend='qasm_simulator')
+        inj_device = qml.device('lightning.qubit', wires=c.device.num_wires)
         inj_qnode = qml.QNode(c.func, inj_device)
         answer = probs_to_counts(inj_qnode(), base_circuit.device.num_wires)
         answers.append(answer)
@@ -209,9 +204,10 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 #%%
-theta_values = [np.pi] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
-phi_values = [np.pi] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
+theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
+phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
+fp=open("./run_circuits_u_gate_logging.txt", "a")
 tstart = datetime.datetime.now()
 print('Start:',tstart)
 fp.write('Start:'+str(tstart))
@@ -259,10 +255,10 @@ fp.write('Total elapsed time:'+str(tend-tstart))
 # Careful! Very verbose
 print(results)
 
-
 #%%
-filename_output = '../results/u_gate_15degrees_step_qft_4_pennylane_lightning.p.gz'
+filename_output = '../results/u_gate_15degrees_step_bv_4_pennylane_lightning.p.gz'
 pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
 fp.close()
+# %%
