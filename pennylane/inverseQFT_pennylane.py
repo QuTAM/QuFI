@@ -42,4 +42,6 @@ def build_circuit(nqubits):
         # Measurement
         return qml.probs(wires=range(nqubits))
 
+    circuit()
+
     return circuit

@@ -24,6 +24,8 @@ fp=open("./run_circuits_u_gate_logging.txt", "a")
 #%%
 circuits = []
 
+# Qiskit defined circuits ######################################
+
 #from circuits import Grover
 #grove = Grover.build_circuit()
 #circuits.append( (grove, 'Grover') )
@@ -34,24 +36,18 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 
 #bv_5 = Bernstein_Vazirani.build_circuit(4, '1010')
 #circuits.append( (bv_5, 'Bernstein-Vazirani_5') )
-#
 #bv_6 = Bernstein_Vazirani.build_circuit(5, '10101')
 #circuits.append( (bv_6, 'Bernstein-Vazirani_6') )
-#
 #bv_7 = Bernstein_Vazirani.build_circuit(6, '101010')
 #circuits.append( (bv_7, 'Bernstein-Vazirani_7') )
-
 
 #from circuits import Deutsch_Jozsa
 #dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
 #circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
-#
 #dj_5 = Deutsch_Jozsa.build_circuit(4, '1010')
 #circuits.append( (dj_5, 'Deutsch-Jozsa_5') )
-#
 #dj_6 = Deutsch_Jozsa.build_circuit(5, '10101')
 #circuits.append( (dj_6, 'Deutsch-Jozsa_6') )
-#
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
@@ -65,6 +61,41 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 #qft7 = inverseQFT.build_circuit(7)
 #circuits.append( (qft7, 'inverseQFT7') )
 
+# Pennylane defined circuits #################################
+
+import Grover_pennylane
+grover = Grover_pennylane.build_circuit()
+circuits.append( (grover, 'Grover') )
+
+#import Bernstein_Vazirani_pennylane
+#bv4_p = Bernstein_Vazirani_pennylane.build_circuit(3, '101')
+#circuits.append(bv4_p, 'Bernstein-Vazirani_4')
+#bv5_p = Bernstein_Vazirani_pennylane.build_circuit(4, '1010')
+#circuits.append(bv5_p, 'Bernstein-Vazirani_5')
+#bv6_p = Bernstein_Vazirani_pennylane.build_circuit(5, '10101')
+#circuits.append(bv6_p, 'Bernstein-Vazirani_6')
+#bv7_p = Bernstein_Vazirani_pennylane.build_circuit(6, '101010')
+#circuits.append(bv7_p, 'Bernstein-Vazirani_7')
+
+#import Deutsch_Jozsa_pennylane
+#dj_4_p = Deutsch_Jozsa_pennylane.build_circuit(3, '101')
+#circuits.append(dj_4_p, 'Deutsch-Jozsa_4')
+#dj_5_p = Deutsch_Jozsa_pennylane.build_circuit(4, '1010')
+#circuits.append(dj_5_p, 'Deutsch-Jozsa_5')
+#dj_6_p = Deutsch_Jozsa_pennylane.build_circuit(5, '10101')
+#circuits.append(dj_6_p, 'Deutsch-Jozsa_6')
+#dj_7_p = Deutsch_Jozsa_pennylane.build_circuit(6, '101010')
+#circuits.append(dj_7_p, 'Deutsch-Jozsa_7')
+
+#import inverseQFT_pennylane
+#iqft4_p = inverseQFT_pennylane.build_circuit(4)
+#circuits.append( (iqft4_p, 'inverseQFT4') )
+#iqft5_p = inverseQFT_pennylane.build_circuit(5)
+#circuits.append( (iqft5_p, 'inverseQFT5') )
+#iqft6_p = inverseQFT_pennylane.build_circuit(6)
+#circuits.append( (iqft6_p, 'inverseQFT6') )
+#iqft7_p = inverseQFT_pennylane.build_circuit(7)
+#circuits.append( (iqft7_p, 'inverseQFT7') )
 
 #%%
 def probs_to_counts(probs, nwires):
@@ -126,8 +157,9 @@ def convert_circuit(qiskit_circuit):
     def conv_circuit():
         pl_circuit(wires=range(qregs))
         return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
-    # Do NOT remove this print, else the qnode can't bind the function before exiting convert_circuit()'s context
-    print(qml.draw(conv_circuit)())
+    # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_circuit()'s context
+    conv_circuit()
+    #print(qml.draw(conv_circuit)())
     return conv_circuit
 
 @qml.qfunc_transform
@@ -170,16 +202,16 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     output['circuits_injections'], wires = pl_generate_circuits(circuit, name, theta, phi, lam)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
-    # "Then he turned himself into a pickle, funniest shit I've ever seen!"
+    # "Then he turned himself into a pickle, funniest s.inv()hit I've ever seen!"
     output['base_circuit'] = None
     output['circuits_injections'] = wires
     return output
 
 #%%
-theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
-phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
+theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
+phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
 results = []
-for qiskit_circuit in circuits:
+for circuit in circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
@@ -191,16 +223,19 @@ for qiskit_circuit in circuits:
     angle_values = product(theta_values, phi_values)
     for angles in angle_values:
         # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
-        conv_circuit = convert_circuit(qiskit_circuit)
+        if isinstance(circuit[0], qml.QNode):
+            target_circuit = circuit[0]
+        else:
+            target_circuit = convert_circuit(circuit)
         print('-'*80)
         fp.write('-'*80)
         fp.write('\n')
         print("\n")
-        print('circuit:', qiskit_circuit[1], 'theta:', angles[0], 'phi:', angles[1])
-        fp.write('circuit: '+str(qiskit_circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
+        print('circuit:', circuit[1], 'theta:', angles[0], 'phi:', angles[1])
+        fp.write('circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
-        r = pl_inject(conv_circuit, qiskit_circuit[1], theta=angles[0], phi=angles[1])
+        r = pl_inject(target_circuit, circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
     tend = datetime.datetime.now()
     print('done:',tend)

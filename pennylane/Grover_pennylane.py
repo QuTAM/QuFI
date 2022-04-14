@@ -25,4 +25,6 @@ def build_circuit():
         
         return qml.probs(wires=range(2))
 
+    circuit()
+
     return circuit
