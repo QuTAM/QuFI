@@ -24,7 +24,7 @@ fp=open("./run_circuits_u_gate_logging.txt", "a")
 #%%
 circuits = []
 
-# Qiskit defined circuits ######################################
+################### Qiskit defined circuits ####################
 
 #from circuits import Grover
 #grove = Grover.build_circuit()
@@ -61,7 +61,7 @@ circuits.append( (qft4, 'inverseQFT4') )
 #qft7 = inverseQFT.build_circuit(7)
 #circuits.append( (qft7, 'inverseQFT7') )
 
-# Pennylane defined circuits #################################
+################# Pennylane defined circuits ###################
 
 import Grover_pennylane
 grover = Grover_pennylane.build_circuit()
@@ -147,10 +147,11 @@ def run_circuits(base_circuit, generated_circuits):
             }
 
 #%%
-def convert_circuit(qiskit_circuit):
+def convert_qiskit_circuit(qiskit_circuit):
     shots = 1024
     measure_list = [g[1][0]._index for g in qiskit_circuit[0].data if g[0].name == 'measure']
     qregs = qiskit_circuit[0].num_qubits
+    # Avoid qml.load warning on trying to convert measure operators
     qiskit_circuit[0].remove_final_measurements()
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
     device = qml.device("lightning.qubit", wires=qregs, shots=shots)
@@ -158,9 +159,9 @@ def convert_circuit(qiskit_circuit):
     def conv_circuit():
         pl_circuit(wires=range(qregs))
         return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
-    # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_circuit()'s context
+    # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_qiskit_circuit()'s context
     conv_circuit()
-    print(qml.draw(conv_circuit)())
+    #print(qml.draw(conv_circuit)())
     return conv_circuit
 
 @qml.qfunc_transform
@@ -187,7 +188,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
                 transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
                 device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                 transformed_qnode = qml.QNode(transformed_circuit, device)
-                print('circuit:', name, 'gate', op.name, 'theta:', theta, 'phi:', phi)
+                print(f'Generated circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
                 #print(qml.draw(transformed_qnode)())
                 mycircuits.append(transformed_qnode)
                 inj_info.append(wire)
@@ -196,7 +197,6 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
         return mycircuits, inj_info
 
 def pl_inject(circuit, name, theta=0, phi=0, lam=0):
-    print('running {}'.format(name))
     output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
@@ -209,16 +209,19 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 #%%
-theta_values = [np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
-phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
+theta_values = [np.pi] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
+phi_values = [np.pi] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
+tstart = datetime.datetime.now()
+print('Start:',tstart)
+fp.write('Start:'+str(tstart))
 for circuit in circuits:
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
-    tstart = datetime.datetime.now()
-    print('start:',tstart)
-    fp.write('start:'+str(tstart))
+    tstartint = datetime.datetime.now()
+    print('Circuit', circuit[1], 'start:',tstartint)
+    fp.write('Circuit '+circuit[1]+' start:'+str(tstartint))
     fp.write('\n')
     fp.flush()
     angle_values = product(theta_values, phi_values)
@@ -227,26 +230,30 @@ for circuit in circuits:
         if isinstance(circuit[0], qml.QNode):
             target_circuit = circuit[0]
         else:
-            target_circuit = convert_circuit(circuit)
+            target_circuit = convert_qiskit_circuit(circuit)
         print('-'*80)
         fp.write('-'*80)
         fp.write('\n')
         print("\n")
-        print('circuit:', circuit[1], 'theta:', angles[0], 'phi:', angles[1])
-        fp.write('circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
+        print('Injecting circuit:', circuit[1], 'theta:', angles[0], 'phi:', angles[1])
+        fp.write('Injecting circuit: '+str(circuit[1])+ ' theta: '+str(angles[0]) +' phi: '+str(angles[1]))
         fp.write('\n')
         fp.flush()
         r = pl_inject(target_circuit, circuit[1], theta=angles[0], phi=angles[1])
         results.append(r)
-    tend = datetime.datetime.now()
-    print('done:',tend)
-    fp.write('done:'+str(tend))
-    print('Elapsed time:',tend-tstart)
-    fp.write('Elapsed time:'+str(tend-tstart))
+    tendint = datetime.datetime.now()
+    print('done:',tendint)
+    fp.write('done:'+str(tendint))
+    print('Elapsed time:',tendint-tstartint)
+    fp.write('Elapsed time:'+str(tendint-tstartint))
     fp.write('\n')
     print('-'*80)
     fp.write('-'*80)
     fp.write('\n')
+tend = datetime.datetime.now()
+fp.write('done:'+str(tend))
+print('Total elapsed time:',tend-tstart) 
+fp.write('Total elapsed time:'+str(tend-tstart)) 
 
 #%%
 # Careful! Very verbose
@@ -259,6 +266,3 @@ pickle.dump(results, gzip.open(filename_output, 'w'))
 print('files saved to:',filename_output)
 fp.write('files saved to:'+str(filename_output))
 fp.close()
-
-
-# %%
