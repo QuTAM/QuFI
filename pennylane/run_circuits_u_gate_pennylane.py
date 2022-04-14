@@ -14,7 +14,18 @@ from qiskit.providers.aer.noise import NoiseModel
 import pennylane as qml
 import sys
 sys.path.insert(0,'..')
+import networkx as nx
 
+#%%
+device_backend = FakeSydney()
+topology = set(tuple(sorted(l)) for l in device_backend.configuration().to_dict()['coupling_map'])
+print(topology)
+
+tcg = nx.Graph()
+for u, v in topology:
+    tcg.add_edge(u, v)
+
+nx.draw_networkx(tcg)
 
 #%%
 circuits = []
@@ -153,7 +164,7 @@ def convert_qiskit_circuit(qiskit_circuit):
     @qml.qnode(device)
     def conv_circuit():
         pl_circuit(wires=range(qregs))
-        return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
+        return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in racircuits = []nge(qregs)]
     # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_qiskit_circuit()'s context
     conv_circuit()
     #print(qml.draw(conv_circuit)())
