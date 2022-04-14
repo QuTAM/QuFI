@@ -41,9 +41,9 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 #bv_7 = Bernstein_Vazirani.build_circuit(6, '101010')
 #circuits.append( (bv_7, 'Bernstein-Vazirani_7') )
 
-#from circuits import Deutsch_Jozsa
-#dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
-#circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
+from circuits import Deutsch_Jozsa
+dj_4 = Deutsch_Jozsa.build_circuit(3, '101')
+circuits.append( (dj_4, 'Deutsch-Jozsa_4') )
 #dj_5 = Deutsch_Jozsa.build_circuit(4, '1010')
 #circuits.append( (dj_5, 'Deutsch-Jozsa_5') )
 #dj_6 = Deutsch_Jozsa.build_circuit(5, '10101')
@@ -51,9 +51,9 @@ circuits.append( (bv_4, 'Bernstein-Vazirani_4') )
 #dj_7 = Deutsch_Jozsa.build_circuit(6, '101010')
 #circuits.append( (dj_7, 'Deutsch-Jozsa_7') )
 
-#from circuits import inverseQFT
-#qft4 = inverseQFT.build_circuit(4)
-#circuits.append( (qft4, 'inverseQFT4') )
+from circuits import inverseQFT
+qft4 = inverseQFT.build_circuit(4)
+circuits.append( (qft4, 'inverseQFT4') )
 #qft5 = inverseQFT.build_circuit(5)
 #circuits.append( (qft5, 'inverseQFT5') )
 #qft6 = inverseQFT.build_circuit(6)
@@ -149,8 +149,9 @@ def run_circuits(base_circuit, generated_circuits):
 #%%
 def convert_circuit(qiskit_circuit):
     shots = 1024
-    measure_list = [g[1][0].index for g in qiskit_circuit[0].data if g[0].name == 'measure']
+    measure_list = [g[1][0]._index for g in qiskit_circuit[0].data if g[0].name == 'measure']
     qregs = qiskit_circuit[0].num_qubits
+    qiskit_circuit[0].remove_final_measurements()
     pl_circuit = qml.load(qiskit_circuit[0], format='qiskit')
     device = qml.device("lightning.qubit", wires=qregs, shots=shots)
     @qml.qnode(device)
@@ -159,7 +160,7 @@ def convert_circuit(qiskit_circuit):
         return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
     # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_circuit()'s context
     conv_circuit()
-    #print(qml.draw(conv_circuit)())
+    print(qml.draw(conv_circuit)())
     return conv_circuit
 
 @qml.qfunc_transform
@@ -208,7 +209,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 #%%
-theta_values = [0, np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
+theta_values = [np.pi/2] #np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi # [0, np.pi/2]
 phi_values = [0] #np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi # [0]
 results = []
 for circuit in circuits:
