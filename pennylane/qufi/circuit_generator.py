@@ -128,9 +128,7 @@ class IQFT:
         wires -= 1
         qml.Hadamard(wires=wires)
         for qubit in range(wires):
-            U = qml.PhaseShift(pi/2**(wires-qubit), wires=wires)
-            qml.controlledQubitUnitary(U, control_wires=qubit, wires=wires)
-            #qml.ControlledPhase(pi/2**(wires-qubit), wires=[qubit, wires])
+            qml.ControlledPhaseShift(pi/2**(wires-qubit), wires=[qubit, wires])
         # At the end of our function, we call the same function again on
         # the next qubits (we reduced n by one earlier in the function)
         IQFT.qft_rotations(wires)
