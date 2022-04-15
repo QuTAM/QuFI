@@ -18,7 +18,7 @@ phi_values = [np.pi]
 results = execute(circuits, theta_values, phi_values)
 
 #%%
-save_results(results, filename='./prova.p.gz')
+save_results(results, filename="../results/u_gate_15degrees_step_bv_4_pennylane.p.gz")
 
 # %%
 

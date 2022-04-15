@@ -8,7 +8,14 @@ All the dependencies of this project can be installed through the [requirements.
 
 ## Usage
 
-TODO --->
+Simply import qufi as a library and call its methods.  
+
+```python
+import qufi
+from qufi import execute, save_results, IQFT
+```
+
+A complete usage example is available in [run_circuits.py](pennylane/run_circuits.py).  
 
 ## Contributing
 Contribution to the project is welcome, however for opening issues please refer to the original repository by Oliveira.  
