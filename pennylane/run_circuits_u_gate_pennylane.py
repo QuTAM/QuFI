@@ -218,7 +218,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
 theta_values = np.arange(0, np.pi+0.01, np.pi/12) # 0 <= theta <= pi
 phi_values = np.arange(0, 2*np.pi, np.pi/12) # 0 <= phi < 2pi
 results = []
-fp=open("./run_circuits_u_gate_logging.txt", "a")
+fp=open("./run_circuits_u_gate_logging.log", "a")
 tstart = datetime.datetime.now()
 print('Start:',tstart)
 fp.write('Start:'+str(tstart))

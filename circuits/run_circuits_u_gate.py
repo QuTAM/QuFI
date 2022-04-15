@@ -11,7 +11,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from fault_injector_u_gate import inject
 
 
-fp=open("./run_circuits_u_gate_logging.txt", "a")
+fp=open("./run_circuits_u_gate_logging.log", "a")
 
 #%%
 circuits = []
