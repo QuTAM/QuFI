@@ -102,7 +102,21 @@ def pl_insert_gate(tape, index, wire, theta, phi, lam):
             qml.apply(gate)
         i = i + 1
 
-def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
+@qml.qfunc_transform
+def pl_insert_df_gate(tape, index, wire, second_theta, second_phi, lam):
+    i = 0
+    inserted = False
+    for gate in tape.operations + tape.measurements:
+        # Ignore barriers and measurement gates
+        if i > index and not inserted and wire in gate.wires:
+            # If gate are not using a single qubit, insert one gate after each qubit
+            qml.apply(gate)
+            qml.U3(theta=second_theta, phi=second_phi, delta=lam, wires=wire, id="FAULT")
+        else:
+            qml.apply(gate)
+        i = i + 1
+
+def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0, coupling_map=None):
     mycircuits = []
     inj_info = []
     with base_circuit.tape as tape:
@@ -115,17 +129,33 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
                 transformed_qnode = qml.QNode(transformed_circuit, device)
                 log(f'Generated circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
                 #print(qml.draw(transformed_qnode)())
-                mycircuits.append(transformed_qnode)
-                inj_info.append(wire)
+                if coupling_map == None:
+                    mycircuits.append(transformed_qnode)
+                    inj_info.append(wire)
+                else:
+                    for logical_qubit in range(len(tape.wires)):
+                        physical_qubit = coupling_map['logical2physical'][logical_qubit]
+                        neighbouring_qubits = [el[1] for el in coupling_map['topology'] if el[0]==physical_qubit]
+
+                        for neighbor in neighbouring_qubits:
+                            if coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
+                                continue
+                            for second_theta, second_phi in product(np.arange(0, theta+0.01, np.pi/12), np.arange(0, phi+0.01, np.pi/12)):
+                                double_fault_circuit = pl_insert_df_gate(index, coupling_map['physical2logical'][neighbor], second_theta, second_phi, lam)(transformed_qnode.func)
+                                double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
+                                double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
+                                log(f'Generated circuit: {name} with fault on ({op.name}, wire1:{wire}, theta1 = {theta}, phi1 = {phi} and ({op.name}, wire2:{logical_qubit}, theta2 = {second_theta}, phi2 = {second_phi}')
+                                mycircuits.append(double_fault_qnode)
+                                inj_info.append((wire, logical_qubit))
             index = index + 1
         log(f"{len(mycircuits)} circuits generated\n")
         return mycircuits, inj_info
 
-def pl_inject(circuit, name, theta=0, phi=0, lam=0):
-    output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam}
+def pl_inject(circuit, name, theta=0, phi=0, lam=0, coupling_map = None):
+    output = {'name': name, 'base_circuit':circuit, 'theta':theta, 'phi':phi, 'lambda':lam, 'coupling_map':coupling_map}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
-    output['circuits_injections'], wires = pl_generate_circuits(circuit, name, theta, phi, lam)
+    output['circuits_injections'], wires = pl_generate_circuits(circuit, name, theta, phi, lam, coupling_map)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
     # "Then he turned himself into a pickle, funniest shit I've ever seen!"
@@ -133,7 +163,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     output['circuits_injections'] = wires
     return output
 
-def execute(circuits, theta_values=np.arange(0, np.pi+0.01, np.pi/12), phi_values=np.arange(0, 2*np.pi, np.pi/12)):
+def execute(circuits, theta_values=np.arange(0, np.pi+0.01, np.pi/12), phi_values=np.arange(0, 2*np.pi, np.pi/12), coupling_map=None):
     results = []
     tstart = datetime.datetime.now()
     log(f"Start: {tstart}")
@@ -152,7 +182,7 @@ def execute(circuits, theta_values=np.arange(0, np.pi+0.01, np.pi/12), phi_value
                 log(f"Unsupported {type(circuit[0])} object, injection stopped.")
                 exit()
             log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta: {angles[0]} phi: {angles[1]}")
-            r = pl_inject(target_circuit, circuit[1], theta=angles[0], phi=angles[1])
+            r = pl_inject(target_circuit, circuit[1], theta=angles[0], phi=angles[1], coupling_map=coupling_map)
             results.append(r)
         tendint = datetime.datetime.now()
         log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
