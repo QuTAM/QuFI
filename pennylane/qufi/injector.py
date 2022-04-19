@@ -4,7 +4,8 @@ import pickle, gzip
 import datetime
 from math import ceil
 # Importing standard Qiskit libraries
-from qiskit.test.mock import FakeSantiago, FakeCasablanca, FakeSydney
+from qiskit.circuit.quantumcircuit import QuantumCircuit as qiskitQC
+from qiskit.test.mock import FakeSantiago
 from qiskit.providers.aer.noise import NoiseModel
 import pennylane as qml
 import sys
@@ -37,7 +38,7 @@ def probs_to_counts(probs, nwires):
         log(f"Rounding error! {sum(res_dict.values())} != {shots}")
     return res_dict
 
-def run_circuits(base_circuit, generated_circuits):
+def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()):
     # Execute golden circuit simulation without noise
     log('Running circuits')
     gold_device = qml.device('lightning.qubit', wires=base_circuit.device.num_wires)
@@ -45,7 +46,6 @@ def run_circuits(base_circuit, generated_circuits):
     answer_gold = probs_to_counts(gold_qnode(), base_circuit.device.num_wires)
 
     # Execute golden circuit simulation with noise
-    device_backend = FakeSantiago()
     noise_model = NoiseModel.from_backend(device_backend)
     gold_device_noisy = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='aer_simulator', noise_model=noise_model)
     gold_qnode_noisy = qml.QNode(base_circuit.func, gold_device_noisy)
@@ -128,7 +128,7 @@ def pl_inject(circuit, name, theta=0, phi=0, lam=0):
     output['circuits_injections'], wires = pl_generate_circuits(circuit, name, theta, phi, lam)
     output.update(run_circuits( output['base_circuit'], output['circuits_injections'] ) )
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
-    # "Then he turned himself into a pickle, funniest s.inv()hit I've ever seen!"
+    # "Then he turned himself into a pickle, funniest shit I've ever seen!"
     output['base_circuit'] = None
     output['circuits_injections'] = wires
     return output
@@ -146,8 +146,11 @@ def execute(circuits, theta_values=np.arange(0, np.pi+0.01, np.pi/12), phi_value
             # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
             if isinstance(circuit[0], qml.QNode):
                 target_circuit = circuit[0]
-            else:
+            elif isinstance(circuit[0], qiskitQC):
                 target_circuit = convert_qiskit_circuit(circuit)
+            else:
+                log(f"Unsupported {type(circuit[0])} object, injection stopped.")
+                exit()
             log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta: {angles[0]} phi: {angles[1]}")
             r = pl_inject(target_circuit, circuit[1], theta=angles[0], phi=angles[1])
             results.append(r)

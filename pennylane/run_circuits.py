@@ -1,6 +1,4 @@
 #%%
-from os import read
-import py_compile
 import numpy as np
 from qufi import execute, save_results, IQFT
 import qufi
