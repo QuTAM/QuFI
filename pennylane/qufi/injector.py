@@ -91,7 +91,7 @@ def convert_qiskit_circuit(qiskit_circuit):
     return conv_circuit
 
 @qml.qfunc_transform
-def pl_insert_gate(tape, index, wire, theta, phi, lam):
+def pl_insert_gate(tape, index, wire, theta=0, phi=0, lam=0):
     i = 0
     for gate in tape.operations + tape.measurements:
         # Ignore barriers and measurement gates
@@ -104,7 +104,7 @@ def pl_insert_gate(tape, index, wire, theta, phi, lam):
         i = i + 1
 
 @qml.qfunc_transform
-def pl_insert_df_gate(tape, index, wire, second_theta, second_phi, lam):
+def pl_insert_df_gate(tape, index, wire, second_theta=0, second_phi=0, lam=0):
     i = 0
     inserted = False
     for gate in tape.operations + tape.measurements:
@@ -113,6 +113,7 @@ def pl_insert_df_gate(tape, index, wire, second_theta, second_phi, lam):
             # If gate are not using a single qubit, insert one gate after each qubit
             qml.apply(gate)
             qml.U3(theta=second_theta, phi=second_phi, delta=lam, wires=wire, id="FAULT")
+            inserted = True
         else:
             qml.apply(gate)
         i = i + 1
@@ -130,7 +131,8 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
                 device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                 transformed_qnode = qml.QNode(transformed_circuit, device)
                 log(f'Generated circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
-                #print(qml.draw(transformed_qnode)())
+                print(qml.draw(transformed_qnode)())
+                transformed_qnode()
                 mycircuits.append(transformed_qnode)
                 inj_info.append(wire)
                 index_info.append(index)
@@ -141,7 +143,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
 def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     output = {'name': name, 'base_circuit':circuit, 'theta1':theta, 'phi1':phi, 'theta2':0, 'phi2':0, 'lambda':lam}
     output['pennylane_version'] = qml.version()
-    #print(qml.draw(circuit)())
+    print(qml.draw(circuit)())
     generated_circuits, wires, indexes = pl_generate_circuits(circuit, name, theta, phi, lam)
     output['generated_circuits'] = generated_circuits
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
@@ -151,6 +153,7 @@ def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     return output
 
 def pl_insert_df(r, name, theta2, phi2, coupling_map):
+    shots = 1024
     r['theta2'] = theta2
     r['phi2'] = phi2
     double_fault_circuits = []
@@ -166,9 +169,11 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
                         continue
                     else:
                         #log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta1: {angle_pair1[0]} phi1: {angle_pair1[1]} theta2: {angle_pair2[0]} phi2: {angle_pair2[1]}")
-                        double_fault_circuit = pl_insert_df_gate(index, coupling_map['physical2logical'][neighbor], second_theta, second_phi)(deepcopy(qnode).func)
+                        double_fault_circuit = pl_insert_df_gate(index, coupling_map['physical2logical'][neighbor], theta2, phi2)(deepcopy(qnode).func)
                         double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                         double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
+                        double_fault_qnode()
+                        print(qml.draw(double_fault_qnode)())
                         log(f'Generated circuit: {name} with fault on (wire2:{logical_qubit}, theta2 = {theta2}, phi2 = {phi2}')
                         double_fault_circuits.append(double_fault_qnode)
     #print(qml.draw(circuit)())
@@ -203,7 +208,7 @@ def execute(circuits,
                 exit()
 
             log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta1: {angle_pair1[0]} phi1: {angle_pair1[1]}")
-            r = pl_insert(target_circuit, circuit[1], theta1=angle_pair1[0], phi1=angle_pair1[1])
+            r = pl_insert(target_circuit, circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
             if coupling_map != None:
                 angle_combinations_df = product(angles['theta2'], angles['phi2'])
                 for angle_pair2 in angle_combinations_df:
