@@ -8,12 +8,11 @@ circuits = []
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-theta_values = [np.pi]
-phi_values = [np.pi]
+angles = {'theta1':[np.pi], 'phi1':[np.pi], 'theta2':[np.pi], 'phi2':[np.pi]}
 
 #%%
 
-results = execute(circuits, theta_values, phi_values)
+results = execute(circuits, angles)
 
 #%%
 from qiskit.providers.aer import AerSimulator
@@ -35,7 +34,9 @@ coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_
 
 print(coupling_map)
 
-results = execute(circuits, theta_values, phi_values, coupling_map)
+#%%
+
+results = execute(circuits, angles, coupling_map)
 
 #%%
 save_results(results, filename="../results/u_gate_15degrees_step_bv_4_pennylane.p.gz")
