@@ -11,16 +11,14 @@ circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 angles = {'theta1':[np.pi], 'phi1':[np.pi], 'theta2':[np.pi], 'phi2':[np.pi]}
 
 #%%
-
-results = execute(circuits, angles)
-
-#%%
 circuits = []
 
 c = Bell.build_circuit()
 circuits.append((c, 'Bell'))
 
-angles = {'theta1':[np.pi], 'phi1':[np.pi], 'theta2':[np.pi], 'phi2':[np.pi]}
+angles = {'theta1':[1], 'phi1':[2], 'theta2':[3], 'phi2':[4]}
+
+#%%
 
 from qiskit.providers.aer import AerSimulator
 from qiskit import transpile, QuantumCircuit
@@ -28,7 +26,7 @@ from qiskit.test.mock import FakeSantiago
 
 device_backend = FakeSantiago()
 
-bv4_qasm = c.tape.to_openqasm()
+bv4_qasm = circuits[0][0].tape.to_openqasm()
 bv4_qiskit = QuantumCircuit.from_qasm_str(bv4_qasm)
 simulator = AerSimulator.from_backend(device_backend)
 # Transpile the circuit for the noisy basis gates
@@ -37,18 +35,18 @@ mapping = tcirc._layout.get_physical_bits()
 coupling_map = {}
 coupling_map['topology'] = set(tuple(sorted(l)) for l in device_backend.configuration().to_dict()['coupling_map'])
 coupling_map['logical2physical'] = { k._index:v for (k,v) in tcirc._layout.get_virtual_bits().items() if k._register.name == 'q'}
-coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_physical_bits().items()}
+coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_physical_bits().items() if v._register.name == 'q'}
 
 #%%
 
-results = execute(circuits, angles, coupling_map)
+results = execute(circuits, coupling_map=coupling_map)
 
 #%%
-save_results(results, filename="../results/u_gate_15degrees_step_bv_4_pennylane.p.gz")
+save_results(results, filename="../results/u_gate_15degrees_step_bv_4_df_pennylane.p.gz")
 
 # %%
 
-read_results = qufi.read_results_double_fi(["../results/u_gate_15degrees_step_bv_4_pennylane.p.gz"])
+read_results = qufi.read_results_double_fi(["../results/u_gate_15degrees_step_bv_4_df_pennylane.p.gz"])
 
 # %%
 
