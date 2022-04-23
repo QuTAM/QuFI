@@ -8,7 +8,7 @@ circuits = []
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-angles = {'theta1':[np.pi], 'phi1':[np.pi], 'theta2':[np.pi], 'phi2':[np.pi]}
+angles = {'theta1':[1], 'phi1':[2], 'theta2':[3], 'phi2':[4]}
 
 #%%
 circuits = []
@@ -39,7 +39,7 @@ coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_
 
 #%%
 
-results = execute(circuits, coupling_map=coupling_map)
+results = execute(circuits, angles, coupling_map=coupling_map)
 
 #%%
 save_results(results, filename="../results/u_gate_15degrees_step_bv_4_df_pennylane.p.gz")

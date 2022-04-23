@@ -166,9 +166,9 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
         with qnode.tape as tape:
             for gate in tape.operations:
                 if gate.id == 'FAULT':
-                    for logical_qubit in gate.wires:
+                    for logical_qubit in tape.wires:
                         physical_qubit = coupling_map['logical2physical'][logical_qubit]
-                        neighbouring_qubits = [el[1] for el in coupling_map['topology'] if el[0]==physical_qubit] + [el[0] for el in coupling_map['topology'] if el[1]==physical_qubit]
+                        neighbouring_qubits = [el[1] for el in coupling_map['topology'] if el[0]==physical_qubit]
                         # Don't loop over all logical qubits, just over the ones connected! Kinda
                         for neighbor in neighbouring_qubits:
                             if neighbor not in coupling_map['physical2logical'].keys() or coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
@@ -176,15 +176,17 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
                             else:
                                 #log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta1: {angle_pair1[0]} phi1: {angle_pair1[1]} theta2: {angle_pair2[0]} phi2: {angle_pair2[1]}")
                                 second_fault_wire = coupling_map['physical2logical'][neighbor]
+                                if second_fault_wire in gate.wires:
+                                    continue
                                 double_fault_circuit = pl_insert_df_gate(index, second_fault_wire, theta2, phi2)(deepcopy(qnode).func)
                                 double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                                 double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
                                 double_fault_qnode()
                                 log(f'Generated circuit: {name} with secondary fault on (wire2:{second_fault_wire}, theta2 = {theta2}, phi2 = {phi2}) caused by (wire1:{wire}, gate1:{gate.name})')
                                 #print(qml.draw(double_fault_qnode)())
+                                # Due to multiple qubit gates, some double faults are repeated.
                                 double_fault_circuits.append(double_fault_qnode)
     log(f"{len(double_fault_circuits)} double fault circuits generated\n")
-    #print(qml.draw(circuit)())
     r['generated_circuits'] = double_fault_circuits
     return r
 
