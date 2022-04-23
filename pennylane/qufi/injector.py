@@ -34,9 +34,9 @@ def probs_to_counts(probs, nwires):
         count = int(ceil(shots*float(p)))
         if count != 0:
             res_dict[b] = count
-    # debug check for ceil rounding
-    if sum(res_dict.values()) != shots:
-        log(f"Rounding error! {sum(res_dict.values())} != {shots}")
+    # Debug check for ceil rounding (Still bugged somehow, sometimes off by 1-2 shots)
+    #if sum(res_dict.values()) != shots:
+    #    log(f"Rounding error! {sum(res_dict.values())} != {shots}")
     return res_dict
 
 def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()):
@@ -134,7 +134,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
                 transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
                 device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                 transformed_qnode = qml.QNode(transformed_circuit, device)
-                log(f'Generated circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
+                log(f'Generated single fault circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
                 #print(qml.draw(transformed_qnode)())
                 transformed_qnode()
                 mycircuits.append(transformed_qnode)
@@ -182,7 +182,7 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
                                 double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                                 double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
                                 double_fault_qnode()
-                                log(f'Generated circuit: {name} with secondary fault on (wire2:{second_fault_wire}, theta2 = {theta2}, phi2 = {phi2}) caused by (wire1:{wire}, gate1:{gate.name})')
+                                log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta1:{gate.parameters[0]:.2f}, phi1:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta2:{theta2:.2f}, phi2:{phi2:.2f})')
                                 #print(qml.draw(double_fault_qnode)())
                                 # Due to multiple qubit gates, some double faults are repeated.
                                 double_fault_circuits.append(double_fault_qnode)
