@@ -88,10 +88,10 @@ def build_DF_newQVF(data):
                 , 'next_bitstring': next_bitstring
                 , 'next_bitstring_percentage': next_bitstring_percentage
                 , 'QVF':qvf
-                , 'first_qubit_injected':data['circuits_injections'][i]
+                , 'first_qubit_injected':data['wires'][i]
                 , 'first_phi':data['phi1']
                 , 'first_theta':data['theta1']
-                , 'second_qubit_injected':data['circuits_injections'][i]
+                , 'second_qubit_injected':data['second_wires'][i]
                 , 'second_phi':data['phi2']
                 , 'second_theta':data['theta2']
                 #, 'gate_injected':data['circuits_injections'][i].metadata['gate_inserted']

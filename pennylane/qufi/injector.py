@@ -153,6 +153,7 @@ def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     # Remove all qnodes from the output dict since pickle can't process them (they are functions)
     # "Then he turned himself into a pickle, funniest shit I've ever seen!"
     output['wires'] = wires
+    output['second_wires'] = wires
     output['indexes'] = indexes
     return output
 
@@ -160,6 +161,7 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
     shots = 1024
     r['theta2'] = theta2
     r['phi2'] = phi2
+    r['second_wires'] = []
     double_fault_circuits = []
     
     for qnode, wire, index in zip(r['generated_circuits'], r['wires'], r['indexes']):
@@ -186,12 +188,14 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
                                 #print(qml.draw(double_fault_qnode)())
                                 # Due to multiple qubit gates, some double faults are repeated.
                                 double_fault_circuits.append(double_fault_qnode)
+                                r['second_wires'].append(second_fault_wire)
+                                r['wires'].append(wire)
     log(f"{len(double_fault_circuits)} double fault circuits generated\n")
     r['generated_circuits'] = double_fault_circuits
     return r
 
 def pl_inject(circuitStruct):
-    return circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
+    circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
 
 def execute(circuits,
             angles={'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
@@ -223,10 +227,10 @@ def execute(circuits,
                 angle_combinations_df = product(angles['theta2'], angles['phi2'])
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)
-                    s = pl_inject(s)
+                    pl_inject(s)
                     results.append(s)
             else:
-                r = pl_inject(r)
+                pl_inject(r)
                 results.append(r)
         tendint = datetime.datetime.now()
         log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
@@ -236,5 +240,9 @@ def execute(circuits,
     return results
 
 def save_results(results, filename='./results.p.gz'):
+    # Temporary fix for pickle.dump
+    for circuit in results:
+        del circuit['base_circuit']
+        del circuit['generated_circuits']
     pickle.dump(results, gzip.open(filename, 'w'))
     log(f"Files saved to {filename}")
