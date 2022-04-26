@@ -10,6 +10,8 @@ from os import mkdir
 from qiskit.circuit.quantumcircuit import QuantumCircuit as qiskitQC
 from qiskit.test.mock import FakeSantiago
 from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers.aer import AerSimulator
+from qiskit import transpile
 import pennylane as qml
 import sys
 sys.path.insert(0,'..')
@@ -40,6 +42,19 @@ def probs_to_counts(probs, nwires):
     #if sum(res_dict.values()) != shots:
     #    log(f"Rounding error! {sum(res_dict.values())} != {shots}")
     return res_dict
+
+def get_qiskit_coupling_map(qnode, device_backend):
+    bv4_qasm = qnode.tape.to_openqasm()
+    bv4_qiskit = qiskitQC.from_qasm_str(bv4_qasm)
+    simulator = AerSimulator.from_backend(device_backend)
+    # Transpile the circuit for the noisy basis gates
+    tcirc = transpile(bv4_qiskit, simulator, optimization_level=3)
+    coupling_map = {}
+    coupling_map['topology'] = set(tuple(sorted(l)) for l in device_backend.configuration().to_dict()['coupling_map'])
+    coupling_map['logical2physical'] = { k._index:v for (k,v) in tcirc._layout.get_virtual_bits().items() if k._register.name == 'q'}
+    coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_physical_bits().items() if v._register.name == 'q'}
+
+    return coupling_map
 
 def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()):
     # Execute golden circuit simulation without noise
