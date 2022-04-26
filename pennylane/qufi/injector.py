@@ -1,4 +1,5 @@
 from copy import deepcopy
+from sys import exit
 import numpy as np
 from itertools import product
 import pickle, gzip
@@ -106,6 +107,11 @@ def convert_qiskit_circuit(qiskit_circuit):
     conv_circuit()
     #print(qml.draw(conv_circuit)())
     return conv_circuit
+
+def convert_qasm_circuit(qasm_circuit):
+    qiskit_circuit = qiskitQC.from_qasm_str(qasm_circuit[0])
+    qnode = convert_qiskit_circuit((qiskit_circuit, qasm_circuit[1]))
+    return qnode
 
 @qml.qfunc_transform
 def pl_insert_gate(tape, index, wire, theta=0, phi=0, lam=0):
@@ -237,6 +243,8 @@ def execute(circuits,
                 target_circuit = circuit[0]
             elif isinstance(circuit[0], qiskitQC):
                 target_circuit = convert_qiskit_circuit(circuit)
+            elif isinstance(circuit[0], str) and circuit[0].startswith("OPENQASM"):
+                target_circuit = convert_qasm_circuit(circuit)
             else:
                 log(f"Unsupported {type(circuit[0])} object, injection stopped.")
                 exit()
