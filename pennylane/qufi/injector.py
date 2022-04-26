@@ -4,6 +4,8 @@ from itertools import product
 import pickle, gzip
 import datetime
 from math import ceil
+from os.path import isdir, dirname
+from os import mkdir
 # Importing standard Qiskit libraries
 from qiskit.circuit.quantumcircuit import QuantumCircuit as qiskitQC
 from qiskit.test.mock import FakeSantiago
@@ -202,8 +204,11 @@ def execute(circuits,
                     'phi1':np.arange(0, np.pi+0.01, np.pi/12), 
                     'theta2':np.arange(0, np.pi+0.01, np.pi/12), 
                     'phi2':np.arange(0, np.pi+0.01, np.pi/12)}, 
-            coupling_map=None):
-    results = []
+            coupling_map=None,
+            results_folder="./tmp/"):
+    results_folder = "./tmp/"
+    #results = []
+    results_names = []
     tstart = datetime.datetime.now()
     log(f"Start: {tstart}")
     for circuit in circuits:
@@ -228,21 +233,30 @@ def execute(circuits,
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)
                     pl_inject(s)
-                    results.append(s)
+                    #results.append(s)
+                    tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_{angle_pair2[0]}_{angle_pair2[1]}.p.gz"
+                    save_results([s], tmp_name)
+                    results_names.append(tmp_name)
             else:
                 pl_inject(r)
-                results.append(r)
+                #results.append(r)
+                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0_0.p.gz"
+                save_results([r], tmp_name)
+                results_names.append(tmp_name)  
         tendint = datetime.datetime.now()
         log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
     tend = datetime.datetime.now()
     log(f"Done: {tend}\nTotal elapsed time: {tend-tstart}\n")
 
-    return results
+    # return results
+    return results_names
 
 def save_results(results, filename='./results.p.gz'):
     # Temporary fix for pickle.dump
     for circuit in results:
         del circuit['base_circuit']
         del circuit['generated_circuits']
+    if not isdir(dirname(filename)):
+        mkdir(dirname(filename))
     pickle.dump(results, gzip.open(filename, 'w'))
     log(f"Files saved to {filename}")

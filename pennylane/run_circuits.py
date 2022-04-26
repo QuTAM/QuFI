@@ -1,14 +1,15 @@
 #%%
 import numpy as np
-from qufi import execute, save_results, BernsteinVazirani, Bell
+from qufi import execute, BernsteinVazirani, Bell
 import qufi
 
+#%%
 circuits = []
 
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-angles = {'theta1':[1], 'phi1':[2], 'theta2':[3], 'phi2':[4]}
+angles = {'theta1':[1, 2], 'phi1':[2, 3], 'theta2':[3, 4], 'phi2':[4, 5]}
 
 #%%
 circuits = []
@@ -16,10 +17,9 @@ circuits = []
 c = Bell.build_circuit()
 circuits.append((c, 'Bell'))
 
-angles = {'theta1':[1], 'phi1':[2], 'theta2':[3], 'phi2':[4]}
+angles = {'theta1':[1, 2], 'phi1':[2, 3], 'theta2':[3, 4], 'phi2':[4, 5]}
 
 #%%
-
 from qiskit.providers.aer import AerSimulator
 from qiskit import transpile, QuantumCircuit
 from qiskit.test.mock import FakeSantiago
@@ -38,21 +38,14 @@ coupling_map['logical2physical'] = { k._index:v for (k,v) in tcirc._layout.get_v
 coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_physical_bits().items() if v._register.name == 'q'}
 
 #%%
-
-results = execute(circuits, angles, coupling_map=coupling_map)
-
-#%%
-save_results(results, filename="../results/u_gate_15degrees_step_bv_4_df_pennylane.p.gz")
+results_names = execute(circuits, angles, coupling_map=coupling_map, results_folder="./tmp/")
 
 # %%
-
-read_results = qufi.read_results_double_fi(["../results/u_gate_15degrees_step_bv_4_df_pennylane.p.gz"])
+results = qufi.read_results_double_fi(results_names)
 
 # %%
-
-qufi.compute_merged_histogram(read_results)
-qufi.compute_circuit_heatmaps(read_results)
-qufi.compute_circuit_delta_heatmaps(read_results)
-qufi.compute_qubit_histograms(read_results)
-qufi.compute_qubit_heatmaps(read_results)
-
+qufi.compute_merged_histogram(results)
+qufi.compute_circuit_heatmaps(results)
+qufi.compute_circuit_delta_heatmaps(results)
+qufi.compute_qubit_histograms(results)
+qufi.compute_qubit_heatmaps(results)
