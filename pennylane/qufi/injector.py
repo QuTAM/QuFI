@@ -168,7 +168,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
         return mycircuits, inj_info, index_info
 
 def pl_insert(circuit, name, theta=0, phi=0, lam=0):
-    output = {'name': name, 'base_circuit':circuit, 'theta1':theta, 'phi1':phi, 'theta2':0, 'phi2':0, 'lambda':lam}
+    output = {'name': name, 'base_circuit':circuit, 'theta0':theta, 'phi0':phi, 'theta1':0, 'phi1':0, 'lambda':lam}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
     generated_circuits, wires, indexes = pl_generate_circuits(circuit, name, theta, phi, lam)
@@ -180,10 +180,10 @@ def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     output['indexes'] = indexes
     return output
 
-def pl_insert_df(r, name, theta2, phi2, coupling_map):
+def pl_insert_df(r, name, theta1, phi1, coupling_map):
     shots = 1024
-    r['theta2'] = theta2
-    r['phi2'] = phi2
+    r['theta1'] = theta1
+    r['phi1'] = phi1
     r['second_wires'] = []
     double_fault_circuits = []
     
@@ -199,15 +199,15 @@ def pl_insert_df(r, name, theta2, phi2, coupling_map):
                             if neighbor not in coupling_map['physical2logical'].keys() or coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
                                 continue
                             else:
-                                #log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta1: {angle_pair1[0]} phi1: {angle_pair1[1]} theta2: {angle_pair2[0]} phi2: {angle_pair2[1]}")
+                                #log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]} theta1: {angle_pair2[0]} phi1: {angle_pair2[1]}")
                                 second_fault_wire = coupling_map['physical2logical'][neighbor]
                                 if second_fault_wire in gate.wires:
                                     continue
-                                double_fault_circuit = pl_insert_df_gate(index, second_fault_wire, theta2, phi2)(deepcopy(qnode).func)
+                                double_fault_circuit = pl_insert_df_gate(index, second_fault_wire, theta1, phi1)(deepcopy(qnode).func)
                                 double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
                                 double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
                                 double_fault_qnode()
-                                log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta1:{gate.parameters[0]:.2f}, phi1:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta2:{theta2:.2f}, phi2:{phi2:.2f})')
+                                log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta0:{gate.parameters[0]:.2f}, phi0:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta1:{theta1:.2f}, phi1:{phi1:.2f})')
                                 #print(qml.draw(double_fault_qnode)())
                                 # Due to multiple qubit gates, some double faults are repeated.
                                 double_fault_circuits.append(double_fault_qnode)
@@ -221,10 +221,10 @@ def pl_inject(circuitStruct):
     circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
 
 def execute(circuits,
-            angles={'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
-                    'phi1':np.arange(0, np.pi+0.01, np.pi/12), 
-                    'theta2':np.arange(0, np.pi+0.01, np.pi/12), 
-                    'phi2':np.arange(0, np.pi+0.01, np.pi/12)}, 
+            angles={'theta0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
+                    'phi0':np.arange(0, np.pi+0.01, np.pi/12), 
+                    'theta1':np.arange(0, 2*np.pi+0.01, np.pi/12), 
+                    'phi1':np.arange(0, np.pi+0.01, np.pi/12)}, 
             coupling_map=None,
             results_folder="./tmp/"):
     results_folder = "./tmp/"
@@ -236,7 +236,7 @@ def execute(circuits,
         log(f"-"*80+"\n")
         tstartint = datetime.datetime.now()
         log(f"Circuit {circuit[1]} start: {tstartint}")
-        angle_combinations = product(angles['theta1'], angles['phi1'])
+        angle_combinations = product(angles['theta0'], angles['phi0'])
         for angle_pair1 in angle_combinations:
             # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
             if isinstance(circuit[0], qml.QNode):
@@ -249,10 +249,10 @@ def execute(circuits,
                 log(f"Unsupported {type(circuit[0])} object, injection stopped.")
                 exit()
 
-            log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta1: {angle_pair1[0]} phi1: {angle_pair1[1]}")
+            log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]}")
             r = pl_insert(deepcopy(target_circuit), circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
             if coupling_map != None:
-                angle_combinations_df = product(angles['theta2'], angles['phi2'])
+                angle_combinations_df = product(angles['theta1'], angles['phi1'])
                 tmp_results = []
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)

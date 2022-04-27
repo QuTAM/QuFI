@@ -89,11 +89,11 @@ def build_DF_newQVF(data):
                 , 'next_bitstring_percentage': next_bitstring_percentage
                 , 'QVF':qvf
                 , 'first_qubit_injected':data['wires'][i]
-                , 'first_phi':data['phi1']
-                , 'first_theta':data['theta1']
+                , 'first_phi':data['phi0']
+                , 'first_theta':data['theta0']
                 , 'second_qubit_injected':data['second_wires'][i]
-                , 'second_phi':data['phi2']
-                , 'second_theta':data['theta2']
+                , 'second_phi':data['phi1']
+                , 'second_theta':data['theta1']
                 #, 'gate_injected':data['circuits_injections'][i].metadata['gate_inserted']
                 #, 'lambda':data['circuits_injections'][i].metadata['lambda']
                 , 'circuit_name':data['name']
@@ -130,8 +130,8 @@ def read_results_directory(filenames):
             df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
         del data
     
-        if index % (len(filenames)//10) == 0:
-            print(f"{index / len(filenames)}% complete\n")
+        if len(filenames) > 1 and index % (len(filenames)//10) == 0:
+            print(f"{int(round(index / len(filenames) * 100))}% complete\n")
     return df_newQVF
 
 def read_results_single_fi(filenames):
