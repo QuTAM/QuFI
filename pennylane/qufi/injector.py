@@ -253,13 +253,17 @@ def execute(circuits,
             r = pl_insert(deepcopy(target_circuit), circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
             if coupling_map != None:
                 angle_combinations_df = product(angles['theta2'], angles['phi2'])
+                tmp_results = []
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)
                     pl_inject(s)
                     #results.append(s)
+                    tmp_results.append(s)
                     tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_{angle_pair2[0]}_{angle_pair2[1]}.p.gz"
-                    save_results([s], tmp_name)
+                    #save_results([s], tmp_name)
                     results_names.append(tmp_name)
+                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0_0.p.gz"
+                save_results(tmp_results, tmp_name)
             else:
                 pl_inject(r)
                 #results.append(r)

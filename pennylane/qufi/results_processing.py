@@ -119,6 +119,21 @@ def read_results_double_fi(filenames):
     
     return df_newQVF
 
+def read_results_directory(filenames):
+    """Process double fault injection results directory and return all data"""
+    # read all data and insert it into one dataframe
+    df_newQVF = pd.DataFrame()
+    for filename, index in zip(filenames, range(len(filenames))):
+        data = pickle.load(gzip.open(filename, 'r'))
+        
+        for d in data:
+            df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
+        del data
+    
+        if index % (len(filenames)//10) == 0:
+            print(f"{index / len(filenames)}% complete\n")
+    return df_newQVF
+
 def read_results_single_fi(filenames):
     """Process single/double fault injection results files and return only single faults data"""
     df_results = read_results_double_fi(filenames)
