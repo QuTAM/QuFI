@@ -220,7 +220,7 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
 def pl_inject(circuitStruct):
     circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
 
-def execute(circuits,
+def execute_over_range(circuits,
             angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
                     'phi0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
                     'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
@@ -277,6 +277,55 @@ def execute(circuits,
 
     # return results
     return results_names
+
+def execute(circuits,
+            angles=None, 
+            coupling_map=None,
+            results_folder="./tmp/"):
+    results_folder = "./tmp/"
+    results_names = []
+    tstart = datetime.datetime.now()
+    log(f"Start: {tstart}")
+    for circuit in circuits:
+        log(f"-"*80+"\n")
+        tstartint = datetime.datetime.now()
+        log(f"Circuit {circuit[1]} start: {tstartint}")
+        # angle_combinations = product(angles['theta0'], angles['phi0'])
+        # for angle_pair1 in angle_combinations:
+        # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
+        if isinstance(circuit[0], qml.QNode):
+            target_circuit = circuit[0]
+        elif isinstance(circuit[0], qiskitQC):
+            target_circuit = convert_qiskit_circuit(circuit)
+        elif isinstance(circuit[0], str) and circuit[0].startswith("OPENQASM"):
+            target_circuit = convert_qasm_circuit(circuit)
+        else:
+            log(f"Unsupported {type(circuit[0])} object, injection stopped.")
+            exit()
+        
+        for angles_batch, batch in zip(np.array_split(angles, ceil(len(angles)/500)), range(1, ceil(len(angles)/500) + 1) ):
+            results = []
+            for angles_combination, iteration in zip(angles_batch, range(1, len(angles_batch))):
+                log(f"Executing iteration:{iteration}/{len(angles_batch)} batch:{batch}/{ceil(len(angles)/500)}")
+                log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angles_combination[0]} phi0: {angles_combination[1]}")
+                r = pl_insert(deepcopy(target_circuit), circuit[1], theta=angles_combination[0], phi=angles_combination[1])
+                if coupling_map != None:
+                    s = pl_insert_df(deepcopy(r), circuit[1], angles_combination[2], angles_combination[3], coupling_map)
+                    pl_inject(s)
+                    results.append(s)
+                else:
+                    pl_inject(r)
+                    results.append(r)
+            tmp_name = f"{results_folder}{circuit[1]}_{angles_combination[0]}_{angles_combination[1]}_{angles_combination[2]}_{angles_combination[3]}.p.gz"
+            results_names.append(tmp_name)
+            save_results(results, tmp_name)
+        tendint = datetime.datetime.now()
+        log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
+    tend = datetime.datetime.now()
+    log(f"Done: {tend}\nTotal elapsed time: {tend-tstart}\n")
+
+    return results_names
+
 
 def save_results(results, filename='./results.p.gz'):
     # Temporary fix for pickle.dump
