@@ -13,7 +13,7 @@ from matplotlib import colors
 from matplotlib.colors import LinearSegmentedColormap
 from seaborn import set_theme
 from matplotlib import style
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from os import scandir
 
 rcParams.update({'figure.autolayout': True})
@@ -136,7 +136,7 @@ def read_results_directory(dir):
         if filename.is_file():
             filenames.append(filename.path)
 
-    pool = Pool(len(filenames))
+    pool = Pool(cpu_count())
     df = pd.concat(pool.map(read_file, filenames))
     pool.close()
     pool.join()
