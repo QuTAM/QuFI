@@ -14,10 +14,10 @@ circuits = []
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-angles={'theta0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-        'phi0':np.arange(0, np.pi+0.01, np.pi/12), 
-        'theta1':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-        'phi1':np.arange(0, np.pi+0.01, np.pi/12)}
+angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
+        'phi0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
+        'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
+        'phi1':np.arange(0, 2*np.pi+0.01, np.pi/12)}
 
 # Custom coupling map
 coupling_map = {'topology': {(0, 1), (1, 2), (2, 3), (3, 4)}, 'logical2physical': {0: 3, 1: 4, 3: 2, 2: 0}, 'physical2logical': {3: 0, 4: 1, 2: 3, 0: 2}}

@@ -130,8 +130,8 @@ def read_results_directory(filenames):
             df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
         del data
     
-        if len(filenames) > 1 and index % (len(filenames)//10) == 0:
-            print(f"{int(round(index / len(filenames) * 100))}% complete\n")
+        if len(filenames) > 1 and index % (len(filenames)/10) == 0:
+            print(f"{int(round(index / len(filenames) * 100))}% complete")
     return df_newQVF
 
 def read_results_single_fi(filenames):

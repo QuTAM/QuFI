@@ -221,10 +221,10 @@ def pl_inject(circuitStruct):
     circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
 
 def execute(circuits,
-            angles={'theta0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-                    'phi0':np.arange(0, np.pi+0.01, np.pi/12), 
-                    'theta1':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-                    'phi1':np.arange(0, np.pi+0.01, np.pi/12)}, 
+            angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
+                    'phi0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
+                    'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
+                    'phi1':np.arange(0, 2*np.pi+0.01, np.pi/12)}, 
             coupling_map=None,
             results_folder="./tmp/"):
     results_folder = "./tmp/"
@@ -252,7 +252,7 @@ def execute(circuits,
             log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]}")
             r = pl_insert(deepcopy(target_circuit), circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
             if coupling_map != None:
-                angle_combinations_df = product(angles['theta1'], angles['phi1'])
+                angle_combinations_df = product(np.arange(0, angle_pair1[0]+0.01, np.pi/12), np.arange(0, angle_pair1[1]+0.01, np.pi/12)) #product(angles['theta1'], angles['phi1']) to loop over the provided theta1/phi1 values
                 tmp_results = []
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)

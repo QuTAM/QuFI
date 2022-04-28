@@ -2,10 +2,10 @@
 import os
 import numpy as np
 
-angles={'theta0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-        'phi0':np.arange(0, np.pi+0.01, np.pi/12), 
-        'theta1':np.arange(0, 2*np.pi+0.01, np.pi/12), 
-        'phi1':np.arange(0, np.pi+0.01, np.pi/12)}
+angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
+        'phi0':np.arange(0, 2*np.pi+0.01, np.pi/12), 
+        'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
+        'phi1':np.arange(0, 2*np.pi+0.01, np.pi/12)}
 splits = len(angles['theta0'])
 #%%
 os.system(f"byobu new-session -d -s qufi \"htop\"")
