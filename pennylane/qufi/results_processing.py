@@ -13,6 +13,8 @@ from matplotlib import colors
 from matplotlib.colors import LinearSegmentedColormap
 from seaborn import set_theme
 from matplotlib import style
+from multiprocessing import Pool
+from os import scandir
 
 rcParams.update({'figure.autolayout': True})
 rcParams['pdf.fonttype'] = 42
@@ -119,20 +121,26 @@ def read_results_double_fi(filenames):
     
     return df_newQVF
 
-def read_results_directory(filenames):
-    """Process double fault injection results directory and return all data"""
-    # read all data and insert it into one dataframe
+def read_file(filename):
     df_newQVF = pd.DataFrame()
-    for filename, index in zip(filenames, range(len(filenames))):
-        data = pickle.load(gzip.open(filename, 'r'))
-        
-        for d in data:
-            df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
-        del data
-    
-        if len(filenames) > 1 and index % (len(filenames)/10) == 0:
-            print(f"{int(round(index / len(filenames) * 100))}% complete")
+    data = pickle.load(gzip.open(filename, 'r'))
+    for d in data:
+        df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
+    del data
     return df_newQVF
+
+def read_results_directory(dir):
+    """Process double fault injection results directory and return all data"""
+    filenames = []
+    for filename in scandir(dir):
+        if filename.is_file():
+            filenames.append(filename.path)
+
+    pool = Pool(len(filenames))
+    df = pd.concat(pool.map(read_file, filenames))
+    pool.close()
+    pool.join()
+    return df
 
 def read_results_single_fi(filenames):
     """Process single/double fault injection results files and return only single faults data"""
