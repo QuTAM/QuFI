@@ -1,19 +1,9 @@
 #%%
-from copy import deepcopy
-import pickle, gzip
+import pickle, gzip, os, re, itertools
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import glob, os
-import re, ast
-import itertools
 import seaborn as sns
-from matplotlib import rcParams
-from qiskit.visualization import plot_histogram
-from matplotlib import colors
-from matplotlib.colors import LinearSegmentedColormap
-from seaborn import set_theme
-from matplotlib import style
+from matplotlib import rcParams, colors
 from multiprocessing import Pool, cpu_count
 from multiprocessing.pool import ThreadPool
 from os import scandir
