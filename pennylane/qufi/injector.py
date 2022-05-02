@@ -23,6 +23,7 @@ logging_filename = "./qufi.log"
 console_logging = True
 
 def log(content):
+    """Logging wrapper, can redirect both to stdout and a file"""
     if file_logging:
         fp = open(logging_filename, "a")
         fp.write(content+'\n')
@@ -32,6 +33,7 @@ def log(content):
         print(content)
 
 def probs_to_counts(probs, nwires):
+    """Utility to convert pennylane result probabilities to qiskit counts"""
     res_dict = {}
     shots = 1024
     for p, t in zip(probs, list(product(['0', '1'], repeat=nwires))):
@@ -45,10 +47,12 @@ def probs_to_counts(probs, nwires):
     return res_dict
 
 def get_qiskit_coupling_map(qnode, device_backend):
+    """Get structured coupling map compatible with qufi from given qiskit backend"""
     bv4_qasm = qnode.tape.to_openqasm()
     bv4_qiskit = qiskitQC.from_qasm_str(bv4_qasm)
     simulator = AerSimulator.from_backend(device_backend)
     # Transpile the circuit for the noisy basis gates
+    # If there are not enough qubits, transpile will throw an error for us
     tcirc = transpile(bv4_qiskit, simulator, optimization_level=3)
     coupling_map = {}
     coupling_map['topology'] = set(tuple(sorted(l)) for l in device_backend.configuration().to_dict()['coupling_map'])
@@ -58,6 +62,7 @@ def get_qiskit_coupling_map(qnode, device_backend):
     return coupling_map
 
 def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()):
+    """Internally called function which runs the circuits for all golden/faulty noiseless/noisy combinations"""
     # Execute golden circuit simulation without noise
     log('Running circuits')
     gold_device = qml.device('lightning.qubit', wires=base_circuit.device.num_wires)
@@ -92,6 +97,7 @@ def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()
             }
 
 def convert_qiskit_circuit(qiskit_circuit):
+    """Converts a qiskit QuantumCircuit object to a pennylane QNode object"""
     shots = 1024
     measure_list = [g[1][0]._index for g in qiskit_circuit[0].data if g[0].name == 'measure']
     qregs = qiskit_circuit[0].num_qubits
@@ -109,12 +115,14 @@ def convert_qiskit_circuit(qiskit_circuit):
     return conv_circuit
 
 def convert_qasm_circuit(qasm_circuit):
+    """Converts a QASM string to a pennylane QNode object"""
     qiskit_circuit = qiskitQC.from_qasm_str(qasm_circuit[0])
     qnode = convert_qiskit_circuit((qiskit_circuit, qasm_circuit[1]))
     return qnode
 
 @qml.qfunc_transform
 def pl_insert_gate(tape, index, wire, theta=0, phi=0, lam=0):
+    """Decorator qfunc_transform which inserts a single fault gate"""
     i = 0
     for gate in tape.operations + tape.measurements:
         # Ignore barriers and measurement gates
@@ -128,6 +136,7 @@ def pl_insert_gate(tape, index, wire, theta=0, phi=0, lam=0):
 
 @qml.qfunc_transform
 def pl_insert_df_gate(tape, index, wire, second_theta=0, second_phi=0, lam=0):
+    """Decorator qfunc_transform which inserts a second fault gate after a given index in the QNode.tape"""
     i = 0
     inserted = False
     for gate in tape.operations:
@@ -146,6 +155,7 @@ def pl_insert_df_gate(tape, index, wire, second_theta=0, second_phi=0, lam=0):
         qml.apply(meas)
 
 def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
+    """Generate all possible fault circuits"""
     mycircuits = []
     inj_info = []
     index_info = []
@@ -168,19 +178,19 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
         return mycircuits, inj_info, index_info
 
 def pl_insert(circuit, name, theta=0, phi=0, lam=0):
+    """Wrapper for constructing the single fault circuits object"""
     output = {'name': name, 'base_circuit':circuit, 'theta0':theta, 'phi0':phi, 'theta1':0, 'phi1':0, 'lambda':lam}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
     generated_circuits, wires, indexes = pl_generate_circuits(circuit, name, theta, phi, lam)
     output['generated_circuits'] = generated_circuits
-    # Remove all qnodes from the output dict since pickle can't process them (they are functions)
-    # "Then he turned himself into a pickle, funniest shit I've ever seen!"
     output['wires'] = wires
     output['second_wires'] = wires
     output['indexes'] = indexes
     return output
 
 def pl_insert_df(r, name, theta1, phi1, coupling_map):
+    """Wrapper for expanding a single fault circuits object to a double fault one"""
     shots = 1024
     r['theta1'] = theta1
     r['phi1'] = phi1
@@ -199,7 +209,6 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
                             if neighbor not in coupling_map['physical2logical'].keys() or coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
                                 continue
                             else:
-                                #log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]} theta1: {angle_pair2[0]} phi1: {angle_pair2[1]}")
                                 second_fault_wire = coupling_map['physical2logical'][neighbor]
                                 if second_fault_wire in gate.wires:
                                     continue
@@ -209,7 +218,6 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
                                 double_fault_qnode()
                                 log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta0:{gate.parameters[0]:.2f}, phi0:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta1:{theta1:.2f}, phi1:{phi1:.2f})')
                                 #print(qml.draw(double_fault_qnode)())
-                                # Due to multiple qubit gates, some double faults are repeated.
                                 double_fault_circuits.append(double_fault_qnode)
                                 r['second_wires'].append(second_fault_wire)
                                 r['wires'].append(wire)
@@ -218,6 +226,7 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
     return r
 
 def pl_inject(circuitStruct):
+    """Run a single/double fault circuits object"""
     circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
 
 def execute_over_range(circuits,
@@ -227,6 +236,7 @@ def execute_over_range(circuits,
                     'phi1':np.arange(0, 2*np.pi+0.01, np.pi/12)}, 
             coupling_map=None,
             results_folder="./tmp/"):
+    """Given a range of angles, build all single/double fault injection circuits and run them sequentially"""
     results_folder = "./tmp/"
     #results = []
     results_names = []
@@ -282,6 +292,7 @@ def execute(circuits,
             angles=None, 
             coupling_map=None,
             results_folder="./tmp/"):
+    """Given a list of angle combinations, split them in batches, then compute all circuits and run them sequentially"""
     results_folder = "./tmp/"
     results_names = []
     tstart = datetime.datetime.now()
@@ -290,9 +301,6 @@ def execute(circuits,
         log(f"-"*80+"\n")
         tstartint = datetime.datetime.now()
         log(f"Circuit {circuit[1]} start: {tstartint}")
-        # angle_combinations = product(angles['theta0'], angles['phi0'])
-        # for angle_pair1 in angle_combinations:
-        # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
         if isinstance(circuit[0], qml.QNode):
             target_circuit = circuit[0]
         elif isinstance(circuit[0], qiskitQC):
@@ -328,6 +336,7 @@ def execute(circuits,
 
 
 def save_results(results, filename='./results.p.gz'):
+    """Save a single/double circuits results object"""
     # Temporary fix for pickle.dump
     for circuit in results:
         del circuit['base_circuit']
