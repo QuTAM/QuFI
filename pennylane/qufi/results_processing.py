@@ -15,6 +15,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from seaborn import set_theme
 from matplotlib import style
 from multiprocessing import Pool, cpu_count
+from multiprocessing.pool import ThreadPool
 from os import scandir
 
 rcParams.update({'figure.autolayout': True})
@@ -164,7 +165,7 @@ def get_processed_table(results):
     table = []
     tuples = list(itertools.product(circuits, phi_list, theta_list))
     tuples = [(circuit, phi, theta, results) for circuit, phi, theta in tuples]
-    pool = Pool(cpu_count())
+    pool = ThreadPool(cpu_count())
     table = pool.map(compute_QVF_entry, tuples)
     pool.close()
     pool.join()
