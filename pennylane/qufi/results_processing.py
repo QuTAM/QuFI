@@ -110,6 +110,7 @@ def filter_single_fi(results):
     return results[(results.second_phi == 0) & (results.second_theta == 0)]
 
 def read_file(filename):
+    """Read a partial result file"""
     df_newQVF = pd.DataFrame()
     data = pickle.load(gzip.open(filename, 'r'))
     for d in data:
@@ -133,6 +134,7 @@ def read_results_directory(dir):
 #%%
 
 def get_circuits_angles(results):
+    """Utility to extract useful information"""
     phi_list = list(set(results.first_phi))
     phi_list.sort(reverse=False)
     theta_list = list(set(results.first_theta))
@@ -143,6 +145,7 @@ def get_circuits_angles(results):
     return circuits, theta_list, phi_list
 
 def compute_QVF_entry(intuple):
+    """Compute one entry of the qvf table"""
     circuit = intuple[0]
     phi = intuple[1]
     theta = intuple[2]
@@ -283,7 +286,7 @@ def compute_circuit_delta_heatmaps(circs, savepath="./plots/deltaHeatmaps/"):
 #%%
 
 def compute_qubit_histograms(circs, savepath="./plots/histograms/"):
-    """Compute single qubit histograms"""
+    """Compute single qubit histograms for single and double FI"""
 
     for df, type_inj in zip(circs, ["single", "double"]):
         circuits, theta_list, phi_list = get_circuits_angles(df)
@@ -318,7 +321,7 @@ def compute_qubit_histograms(circs, savepath="./plots/histograms/"):
                 plt.close()
 
 def compute_qubit_heatmaps(circs, savepath="./plots/heatmaps/"):
-    """Compute single qubit histograms"""
+    """Compute single qubit histograms for single and double FI"""
 
     theta_list_tex = ['0', '', '', '$\\frac{\pi}{4}$', '', '', '$\\frac{\pi}{2}$', ''
                     , '', '$\\frac{3\pi}{4}$', '', '', '$\pi$']
@@ -354,6 +357,7 @@ def compute_qubit_heatmaps(circs, savepath="./plots/heatmaps/"):
 #%%
 
 def generate_all_statistics(results, savepath="./plots"):
+    """Call process_results only once and compute all histograms and heatmaps"""
     circs = [process_results(filter_single_fi(results)), process_results(results)]
 
     compute_merged_histogram(circs, f"{savepath}/histograms/")
