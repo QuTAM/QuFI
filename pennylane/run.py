@@ -5,7 +5,7 @@ from qufi import execute
 from dill import load
 from multiprocessing import cpu_count
 
-index = argv[1]
+index = int(argv[1])
 splits = cpu_count()
 
 #%%
