@@ -163,3 +163,20 @@ class IQFT:
         circuit()
 
         return circuit
+
+class Bell:
+
+    def build_circuit():
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.Hadamard(wires=0)
+            qml.CNOT(wires=[0, 1])
+
+            # Measurement
+            return qml.probs(wires=1)
+
+        circuit()
+
+        return circuit

@@ -1,32 +1,27 @@
 #%%
 import numpy as np
-from qufi import execute, save_results, IQFT
-import qufi
+from qiskit.test.mock import FakeSantiago
+from qufi import execute_over_range, BernsteinVazirani, get_qiskit_coupling_map, read_results_directory, generate_all_statistics
 
+#%%
 circuits = []
 
-bv4_p = IQFT.build_circuit(4)
+bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-theta_values = [np.pi]
-phi_values = [np.pi]
+angles = {'theta0':[1, 2], 'phi0':[2, 3], 'theta1':[3, 4], 'phi1':[4, 5]}
 
 #%%
-
-results = execute(circuits, theta_values, phi_values)
+device_backend = FakeSantiago()
+coupling_map = get_qiskit_coupling_map(circuits[0][0], device_backend)
 
 #%%
-save_results(results, filename="../results/u_gate_15degrees_step_bv_4_pennylane.p.gz")
+results_names = execute_over_range(circuits, angles, coupling_map=coupling_map, results_folder="./tmp/")
 
 # %%
-
-read_results = qufi.read_results_double_fi(["../results/u_gate_15degrees_step_bv_4_pennylane.p.gz"])
+results = read_results_directory("./tmp/")
 
 # %%
+generate_all_statistics(results)
 
-qufi.compute_merged_histogram(read_results)
-qufi.compute_circuit_heatmaps(read_results)
-qufi.compute_circuit_delta_heatmaps(read_results)
-qufi.compute_qubit_histograms(read_results)
-qufi.compute_qubit_heatmaps(read_results)
-
+# %%

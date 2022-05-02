@@ -1,18 +1,12 @@
 #%%
-import pickle, gzip
+import pickle, gzip, os, re, itertools
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import glob, os
-import re, ast
-import itertools
 import seaborn as sns
-from matplotlib import rcParams
-from qiskit.visualization import plot_histogram
-from matplotlib import colors
-from matplotlib.colors import LinearSegmentedColormap
-from seaborn import set_theme
-from matplotlib import style
+from matplotlib import rcParams, colors
+from multiprocessing import Pool, cpu_count
+from multiprocessing.pool import ThreadPool
+from os import scandir
 
 rcParams.update({'figure.autolayout': True})
 rcParams['pdf.fonttype'] = 42
@@ -88,12 +82,12 @@ def build_DF_newQVF(data):
                 , 'next_bitstring': next_bitstring
                 , 'next_bitstring_percentage': next_bitstring_percentage
                 , 'QVF':qvf
-                , 'first_qubit_injected':data['circuits_injections'][i]
-                , 'first_phi':data['phi']
-                , 'first_theta':data['theta']
-                , 'second_qubit_injected':data['circuits_injections'][i]
-                , 'second_phi':0
-                , 'second_theta':0
+                , 'first_qubit_injected':data['wires'][i]
+                , 'first_phi':data['phi0']
+                , 'first_theta':data['theta0']
+                , 'second_qubit_injected':data['second_wires'][i]
+                , 'second_phi':data['phi1']
+                , 'second_theta':data['theta1']
                 #, 'gate_injected':data['circuits_injections'][i].metadata['gate_inserted']
                 #, 'lambda':data['circuits_injections'][i].metadata['lambda']
                 , 'circuit_name':data['name']
@@ -106,29 +100,32 @@ def filter_single_fi(results):
     """Returns only the faults for which no secondary fault was injected"""
     return results[(results.second_phi == 0) & (results.second_theta == 0)]
 
-def read_results_double_fi(filenames):
-    """Process double fault injection results files and return all data"""
-    # read all data and insert it into one dataframe
+def read_file(filename):
+    """Read a partial result file"""
     df_newQVF = pd.DataFrame()
-    for filename in filenames:
-        data = pickle.load(gzip.open(filename, 'r'))
-        
-        for d in data:
-            df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
-        del data
-    
+    data = pickle.load(gzip.open(filename, 'r'))
+    for d in data:
+        df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
+    del data
     return df_newQVF
 
-def read_results_single_fi(filenames):
-    """Process single/double fault injection results files and return only single faults data"""
-    df_results = read_results_double_fi(filenames)
-    df_only_single = filter_single_fi(df_results)
+def read_results_directory(dir):
+    """Process double fault injection results directory and return all data"""
+    filenames = []
+    for filename in scandir(dir):
+        if filename.is_file():
+            filenames.append(filename.path)
 
-    return df_only_single
+    pool = Pool(cpu_count())
+    df = pd.concat(pool.map(read_file, filenames), ignore_index=True)
+    pool.close()
+    pool.join()
+    return df
 
 #%%
 
 def get_circuits_angles(results):
+    """Utility to extract useful information"""
     phi_list = list(set(results.first_phi))
     phi_list.sort(reverse=False)
     theta_list = list(set(results.first_theta))
@@ -138,48 +135,47 @@ def get_circuits_angles(results):
 
     return circuits, theta_list, phi_list
 
+def compute_QVF_entry(intuple):
+    """Compute one entry of the qvf table"""
+    circuit = intuple[0]
+    phi = intuple[1]
+    theta = intuple[2]
+    results = intuple[3]
+    qvf = compute_QVF_michelson_contrast_single_injection(results, circuit, phi, theta)
+    qvf['circuit_name'] = circuit
+    qvf['first_phi'] = phi
+    qvf['first_theta'] = theta
+    return qvf
+
 def get_processed_table(results):
     """Get available circuits and parameters used for injection (phi and theta)"""
 
     circuits, theta_list, phi_list = get_circuits_angles(results)
 
     table = []
-    for circuit in circuits:
-        for phi in phi_list:
-            for theta in theta_list:
-                qvf = compute_QVF_michelson_contrast_single_injection(results, circuit, phi, theta)
-                qvf['circuit_name'] = circuit
-                qvf['first_phi'] = phi
-                qvf['first_theta'] = theta
-                #qvf['threshold'] = threshold
-                table.append(qvf)
+    tuples = list(itertools.product(circuits, phi_list, theta_list))
+    tuples = [(circuit, phi, theta, results) for circuit, phi, theta in tuples]
+    pool = ThreadPool(cpu_count())
+    table = pool.map(compute_QVF_entry, tuples)
+    pool.close()
+    pool.join()
 
     return table
 
-def process_double_fi(results):
-    """Process results and condensate them for each qubit and fault position in the circuit"""
+def process_results(results):
+    """Process results, sort and condensate them for each qubit and fault position in the circuit"""
     table = get_processed_table(results)
 
-    new_qvfDF_noise = pd.DataFrame(table)
-    new_qvfDF_noise = new_qvfDF_noise[sorted(list(new_qvfDF_noise.columns))]
+    processed_results = pd.DataFrame(table)
+    processed_results = processed_results[sorted(list(processed_results.columns))]
 
-    return new_qvfDF_noise
-
-def process_single_fi(results):
-    """Process single fault injection results and condensate them for each qubit and fault position in the circuit"""
-    table = get_processed_table(results)
-
-    new_qvfDF_noise_single = pd.DataFrame(table)
-    new_qvfDF_noise_single = new_qvfDF_noise_single[sorted(list(new_qvfDF_noise_single.columns))]
-
-    return new_qvfDF_noise_single
+    return processed_results
 
 #%%
 
-def compute_merged_histogram(results, savepath="./plots/histograms/"):
-    """Compute and save result histograms"""
+def compute_merged_histogram(circs, savepath="./plots/histograms/"):
+    """Compute and save result histogram of single and double fault injection"""
 
-    circs = [process_single_fi(results), process_double_fi(results)]
     qvf_tmp = list()
     for i, dfCirc in enumerate(circs):
         qvf_tmp.append(dfCirc)
@@ -211,7 +207,7 @@ def compute_merged_histogram(results, savepath="./plots/histograms/"):
 
 #%%
 
-def compute_circuit_heatmaps(results, savepath="./plots/heatmaps/"):
+def compute_circuit_heatmaps(circs, savepath="./plots/heatmaps/"):
     """Compute and save results heatmaps"""
     theta_list_tex = ['0', '', '', '$\\frac{\pi}{4}$', '', '', '$\\frac{\pi}{2}$', ''
                 , '', '$\\frac{3\pi}{4}$', '', '', '$\pi$']
@@ -221,7 +217,6 @@ def compute_circuit_heatmaps(results, savepath="./plots/heatmaps/"):
                 , '', '', '$\\frac{\pi}{2}$', '', '', '$\\frac{\pi}{4}$'
                 , '', '', '0']
 
-    circs = [process_single_fi(results), process_double_fi(results)]          
     for i,circuitDF in enumerate(circs):
         qvf_tmp = circuitDF
         qvf_tmp = qvf_tmp.pivot('first_phi', 'first_theta', 'QVF_circuit')
@@ -242,7 +237,7 @@ def compute_circuit_heatmaps(results, savepath="./plots/heatmaps/"):
             fig.savefig(savepath+circs[0].circuit_name[0]+'_double_heatmap.pdf', bbox_inches='tight')
         plt.close()
 
-def compute_circuit_delta_heatmaps(results, savepath="./plots/deltaHeatmaps/"):
+def compute_circuit_delta_heatmaps(circs, savepath="./plots/deltaHeatmaps/"):
     """Plot delta heatmaps between single and double FI"""
 
     theta_list_tex = ['0', '', '', '$\\frac{\pi}{4}$', '', '', '$\\frac{\pi}{2}$', ''
@@ -253,8 +248,8 @@ def compute_circuit_delta_heatmaps(results, savepath="./plots/deltaHeatmaps/"):
                 , '', '', '$\\frac{\pi}{2}$', '', '', '$\\frac{\pi}{4}$'
                 , '', '', '0']
     
-    qvf_single_fi = process_single_fi(results)
-    qvf_double_fi = process_double_fi(results)
+    qvf_single_fi = circs[0]
+    qvf_double_fi = circs[1]
 
     qvf_tmp = qvf_single_fi.copy()
     qvf_tmp['delta'] = qvf_double_fi['QVF_circuit'] - qvf_single_fi['QVF_circuit']
@@ -281,44 +276,43 @@ def compute_circuit_delta_heatmaps(results, savepath="./plots/deltaHeatmaps/"):
 
 #%%
 
-def compute_qubit_histograms(results, savepath="./plots/histograms/"):
-    """Compute single qubit histograms"""
+def compute_qubit_histograms(circs, savepath="./plots/histograms/"):
+    """Compute single qubit histograms for single and double FI"""
 
-    circuits, theta_list, phi_list = get_circuits_angles(results)
-    new_qvfDF_noise = process_double_fi(results)
-
-    for circuit in circuits:
-        # get a list of qubit columns (circuit may have different number of qubits now)
-        colNames = new_qvfDF_noise[new_qvfDF_noise['circuit_name']==circuit].dropna(axis=1).columns    
-        QVF_list= ['QVF_circuit']
-        QVF_list.extend( [x for x in colNames if re.search('QVF_qubit_.*',x)] ) # uncomment this line to include individual qubit analysis
-        
-        for qvf_idx in QVF_list:
-            qvf_tmp = new_qvfDF_noise[new_qvfDF_noise['circuit_name']==circuit]
-            qvf_tmp = qvf_tmp.pivot('first_phi', 'first_theta', qvf_idx)
-            qvf_tmp.columns.name = '$\\theta$ shift'
-            qvf_tmp.index.name = '$\\phi$ shift'
+    for df, type_inj in zip(circs, ["single", "double"]):
+        circuits, theta_list, phi_list = get_circuits_angles(df)
+        for circuit in circuits:
+            # get a list of qubit columns (circuit may have different number of qubits now)
+            colNames = df[df['circuit_name']==circuit].dropna(axis=1).columns    
+            QVF_list= ['QVF_circuit']
+            QVF_list.extend( [x for x in colNames if re.search('QVF_qubit_.*',x)] ) # uncomment this line to include individual qubit analysis
             
-            all_values = []
-            for column in qvf_tmp:
-                this_column_values = qvf_tmp[column].tolist()
-                all_values += this_column_values
-            one_column_df = pd.DataFrame(all_values)
+            for qvf_idx in QVF_list:
+                qvf_tmp = df[df['circuit_name']==circuit]
+                qvf_tmp = qvf_tmp.pivot('first_phi', 'first_theta', qvf_idx)
+                qvf_tmp.columns.name = '$\\theta$ shift'
+                qvf_tmp.index.name = '$\\phi$ shift'
+                
+                all_values = []
+                for column in qvf_tmp:
+                    this_column_values = qvf_tmp[column].tolist()
+                    all_values += this_column_values
+                one_column_df = pd.DataFrame(all_values)
 
-            fig, ax = plt.subplots(1, 1, figsize=(6, 5))
-            sns.set(font_scale=1.3)
-            ax = sns.distplot(qvf_tmp, bins=256, color='black')
-            plt.xlim(0, 1)
+                fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+                sns.set(font_scale=1.3)
+                ax = sns.distplot(qvf_tmp, bins=256, color='black')
+                plt.xlim(0, 1)
 
-            tmp_mean = one_column_df.mean()
-            tmp_stddev = one_column_df.std()
-            ax.get_yaxis().set_visible(False)
-            tmpFileName = savepath+circuit+'_'+qvf_idx+'_distribution_histogram_'+str(tmp_mean[0])+'_'+str(tmp_stddev[0])+'.pdf'
-            fig.savefig(tmpFileName, bbox_inches = 'tight')
-            plt.close()
+                tmp_mean = one_column_df.mean()
+                tmp_stddev = one_column_df.std()
+                ax.get_yaxis().set_visible(False)
+                tmpFileName = savepath+circuit+'_'+qvf_idx+'_'+type_inj+'_distribution_histogram_'+f"{tmp_mean[0]:.2f}"+'_'+f"{tmp_stddev[0]:.2f}"+'.pdf'
+                fig.savefig(tmpFileName, bbox_inches = 'tight')
+                plt.close()
 
-def compute_qubit_heatmaps(results, savepath="./plots/heatmaps/"):
-    """Compute single qubit histograms"""
+def compute_qubit_heatmaps(circs, savepath="./plots/heatmaps/"):
+    """Compute single qubit histograms for single and double FI"""
 
     theta_list_tex = ['0', '', '', '$\\frac{\pi}{4}$', '', '', '$\\frac{\pi}{2}$', ''
                     , '', '$\\frac{3\pi}{4}$', '', '', '$\pi$']
@@ -328,26 +322,41 @@ def compute_qubit_heatmaps(results, savepath="./plots/heatmaps/"):
                 , '', '', '$\\frac{\pi}{2}$', '', '', '$\\frac{\pi}{4}$'
                 , '', '', '0']
 
-    circuits, theta_list, phi_list = get_circuits_angles(results)
-    new_qvfDF_noise = process_double_fi(results)
+    for df, type_inj in zip(circs, ["single", "double"]):
+        circuits, theta_list, phi_list = get_circuits_angles(df)
+        for circuit in circuits:
+            # get a list of qubit columns (circuit may have different number of qubits now)
+            colNames = df[df['circuit_name']==circuit].dropna(axis=1).columns    
+            QVF_list= ['QVF_circuit']
+            QVF_list.extend( [x for x in colNames if re.search('QVF_qubit_.*',x)] ) # uncomment this line to include individual qubit analysis
+            
+            for qvf_idx in QVF_list:
+                qvf_tmp = df[df['circuit_name']==circuit]
+                qvf_tmp = qvf_tmp.pivot('first_phi', 'first_theta', qvf_idx)
+                qvf_tmp.columns.name = '$\\theta$ shift'
+                qvf_tmp.index.name = '$\\phi$ shift'
+                fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+                param={'label': 'QVF'}
 
-    for circuit in circuits:
-        # get a list of qubit columns (circuit may have different number of qubits now)
-        colNames = new_qvfDF_noise[new_qvfDF_noise['circuit_name']==circuit].dropna(axis=1).columns    
-        QVF_list= ['QVF_circuit']
-        QVF_list.extend( [x for x in colNames if re.search('QVF_qubit_.*',x)] ) # uncomment this line to include individual qubit analysis
-        
-        for qvf_idx in QVF_list:
-            qvf_tmp = new_qvfDF_noise[new_qvfDF_noise['circuit_name']==circuit]
-            qvf_tmp = qvf_tmp.pivot('first_phi', 'first_theta', qvf_idx)
-            qvf_tmp.columns.name = '$\\theta$ shift'
-            qvf_tmp.index.name = '$\\phi$ shift'
-            fig, ax = plt.subplots(1, 1, figsize=(6, 5))
-            param={'label': 'QVF'}
+                divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.5, vmax=1)
+                rdgn = sns.diverging_palette(h_neg=130, h_pos=10, s=200, l=55, sep=20, as_cmap=True)
+                sns.set(font_scale=1.3)
+                ax = sns.heatmap(qvf_tmp, xticklabels=theta_list_tex, yticklabels=phi_list_tex, cmap=rdgn, cbar_kws=param, vmin=0, vmax=1)
+                fig.savefig(savepath+circuit+'_'+qvf_idx+'_'+type_inj+'_heatmap.pdf', bbox_inches='tight')
+                plt.close()
 
-            divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.5, vmax=1)
-            rdgn = sns.diverging_palette(h_neg=130, h_pos=10, s=200, l=55, sep=20, as_cmap=True)
-            sns.set(font_scale=1.3)
-            ax = sns.heatmap(qvf_tmp, xticklabels=theta_list_tex, yticklabels=phi_list_tex, cmap=rdgn, cbar_kws=param, vmin=0, vmax=1)
-            fig.savefig(savepath+circuit+'_'+qvf_idx+'_heatmap.pdf', bbox_inches='tight')
-            plt.close()
+#%%
+
+def generate_all_statistics(results, savepath="./plots"):
+    """Call process_results only once and compute all histograms and heatmaps"""
+    circs = [process_results(filter_single_fi(results)), process_results(results)]
+
+    compute_merged_histogram(circs, f"{savepath}/histograms/")
+    compute_circuit_heatmaps(circs, f"{savepath}/heatmaps/")
+    compute_circuit_delta_heatmaps(circs, f"{savepath}/deltaHeatmaps/")
+    compute_qubit_histograms(circs, f"{savepath}/histograms/")
+    compute_qubit_heatmaps(circs, f"{savepath}/heatmaps/")
+    
+
+# %%
+
