@@ -2,7 +2,6 @@
 import numpy as np
 from qiskit.test.mock import FakeSantiago
 from qufi import execute_over_range, BernsteinVazirani, get_qiskit_coupling_map, read_results_directory, generate_all_statistics
-import qufi
 
 #%%
 circuits = []
@@ -24,3 +23,5 @@ results = read_results_directory("./tmp/")
 
 # %%
 generate_all_statistics(results)
+
+# %%
