@@ -11,6 +11,10 @@ __pycache__/
 # Pickled temporary files for multiprocessing load distribution
 *.pickle
 
+# Results and graphs
+*.p.gz
+*.pdf
+
 # C extensions
 *.so
 
