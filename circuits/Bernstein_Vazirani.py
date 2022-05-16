@@ -20,7 +20,7 @@ def build_circuit(n, s):
         bv_circuit.h(i)
         
     # Apply barrier 
-    bv_circuit.barrier()
+    #bv_circuit.barrier()
     
     # Apply the inner-product oracle
     s = s[::-1] # reverse s to fit qiskit's qubit ordering
@@ -31,7 +31,7 @@ def build_circuit(n, s):
             bv_circuit.cx(q, n)
             
     # Apply barrier 
-    bv_circuit.barrier()
+    #bv_circuit.barrier()
     
     #Apply Hadamard gates after querying the oracle
     for i in range(n):

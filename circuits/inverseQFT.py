@@ -47,7 +47,7 @@ def build_circuit(nqubits):
     qc = inverse_qft(qc, nqubits)
     #qc.measure_all()
     # Measurement
-    qc.barrier()
+    #qc.barrier()
     for i in range(nqubits):
         print(i)
         qc.measure(i, i)

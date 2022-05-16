@@ -2,6 +2,7 @@ import numpy as np
 import pickle, gzip
 
 # importing Qiskit
+import qiskit
 from qiskit import *
 from qiskit import Aer
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister, transpile, assemble

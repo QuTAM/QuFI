@@ -17,13 +17,13 @@ def build_circuit(n, b_str):
             balanced_oracle.x(qubit)
     
     # Use barrier as divider
-    balanced_oracle.barrier()
+    #balanced_oracle.barrier()
     
     # Controlled-NOT gates
     for qubit in range(n):
         balanced_oracle.cx(qubit, n)
     
-    balanced_oracle.barrier()
+    #balanced_oracle.barrier()
     
     # Place X-gates
     for qubit in range(len(b_str)):
@@ -48,7 +48,7 @@ def build_circuit(n, b_str):
     # Repeat H-gates
     for qubit in range(n):
         dj_circuit.h(qubit)
-    dj_circuit.barrier()
+    #dj_circuit.barrier()
     
     # Measure
     for i in range(n):
