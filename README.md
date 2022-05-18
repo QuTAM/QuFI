@@ -15,8 +15,8 @@ import qufi
 from qufi import execute, save_results, IQFT
 ```
 
-A simple usage example is available in [run_circuits.py](pennylane/run_circuits.py).  
-A load distributed campaign example is available in [launch_campaign.py](pennylane/launch_campaign.py).  
+A simple usage example is available in [run_circuits.py](run_circuits.py).  
+A load distributed campaign example is available in [launch_campaign.py](launch_campaign.py).  
 
 ## Contributing
 Contribution to the project is welcome, however for opening issues please refer to the original repository by Oliveira.  
