@@ -13,7 +13,6 @@ __pycache__/
 
 # Results and graphs
 *.p.gz
-*.pdf
 
 # C extensions
 *.so
