@@ -26,4 +26,4 @@ Contribution to the project is welcome, however for opening issues please refer 
 The project has been developed by Marzio Vallero as part of the [Computer Engineering Masters Degree](https://didattica.polito.it/pls/portal30/sviluppo.offerta_formativa.corsi?p_sdu_cds=37:18&p_lang=EN) thesis work _Quantum Machine Learning Fault Injection_ under the guidance of professors B. Montrucchio, P. Rech and assistant researcher Edoardo Giusto, during the second semester of the academic year 2021/2022 at the [Politecnico di Torino University](https://www.polito.it/).
 
 ## License
-For right to use, copyright and warranty of this software, refer to this project's [License](License.md).
+For right to use, copyright and warranty of this software, refer to this project's [License](LICENSE).
