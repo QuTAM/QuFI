@@ -1,6 +1,6 @@
 # QuFI-Pennylane
 
-This repository is a fork containing the Pennylane code adaptation work of the original Qiskit based QuFI (Quantum Fault Injector) proposed by Oliveira _et al._ in the paper [QuFI: a Quantum Fault Injector to Measure the Reliability of Qubits and Quantum Circuits](https://arxiv.org/abs/2203.07183).  
+This repository contains the Pennylane code adaptation work of the original Qiskit based QuFI (Quantum Fault Injector) proposed by Oliveira _et al._ in the paper [QuFI: a Quantum Fault Injector to Measure the Reliability of Qubits and Quantum Circuits](https://arxiv.org/abs/2203.07183).  
 
 ## Installation
 
