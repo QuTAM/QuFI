@@ -1,2 +1,0 @@
-# QuFI
-Quantum Fault Injector
