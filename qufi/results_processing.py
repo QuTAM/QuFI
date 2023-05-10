@@ -52,46 +52,75 @@ def QVF_michelson_contrast(gold_bitstring, answer, shots):
         
     if answer_sorted[0] == gold_bitstring: # gold bitstring has the highest count (max)
         # next bitstring is the second highest
-        next_percent = answer[answer_sorted[1]]/shots 
-        next_bitstring = answer_sorted[1]
+        if good_percent != 1.0:
+            next_percent = answer[answer_sorted[1]]/shots 
+            next_bitstring = answer_sorted[1]
+        else:
+            next_percent = 0.0
+            next_bitstring = 'none'
     else: # gold bitstring has NOT the highest count (not max)
         next_percent = answer[answer_sorted[0]]/shots 
         next_bitstring = answer_sorted[0]
     qvf = (good_percent - next_percent) / (good_percent + next_percent)    
     return 1 - (qvf+1)/2, next_bitstring
     
-def build_DF_newQVF(data):
+def build_DF_newQVF(data, single = False):
     """Read pickled data and store results in a dataframe"""
     results = []
     shots = 1024
-    gold_bitstring = max(data['output_gold_noise'], key=data['output_gold_noise'].get)#check
-    original_gold_percentage = data['output_gold_noise'][gold_bitstring]/shots
+    try:
+        gold_bitstring = max(data['output_gold_noise'], key=data['output_gold_noise'].get)#check
+        original_gold_percentage = data['output_gold_noise'][gold_bitstring]/shots
+        enumerator = enumerate(data['output_injections_noise'])
+    except:
+        gold_bitstring = max(data['output_gold'], key=data['output_gold'].get)#check
+        original_gold_percentage = data['output_gold'][gold_bitstring]/shots
+        enumerator = enumerate(data['output_injections'])
 
-    for i, answer in enumerate(data['output_injections_noise']):
+    for i, answer in enumerator:
         qvf, next_bitstring = QVF_michelson_contrast(gold_bitstring, answer, shots)
         max_key = max(answer, key=answer.get)
         output_percentage = answer[max_key]/shots
-        next_bitstring_percentage = answer[next_bitstring]/shots
+        
         if gold_bitstring not in answer:
             gold_percentage = 0
         else:
             gold_percentage = answer[gold_bitstring]/shots
-        result = {'gold_bitstring':gold_bitstring
-                , 'gold_count_percentage':gold_percentage
-                , 'original_gold_count_percentage':original_gold_percentage
-                , 'next_bitstring': next_bitstring
-                , 'next_bitstring_percentage': next_bitstring_percentage
-                , 'QVF':qvf
-                , 'first_qubit_injected':data['wires'][i]
-                , 'first_phi':data['phi0']
-                , 'first_theta':data['theta0']
-                , 'second_qubit_injected':data['second_wires'][i]
-                , 'second_phi':data['phi1']
-                , 'second_theta':data['theta1']
-                #, 'gate_injected':data['circuits_injections'][i].metadata['gate_inserted']
-                #, 'lambda':data['circuits_injections'][i].metadata['lambda']
-                , 'circuit_name':data['name']
-                }
+        if gold_percentage != 1:
+            next_bitstring_percentage = answer[next_bitstring]/shots
+        else:
+            next_bitstring_percentage = 0.0
+        if single == False:
+            result = {'gold_bitstring':gold_bitstring
+                    , 'gold_count_percentage':gold_percentage
+                    , 'original_gold_count_percentage':original_gold_percentage
+                    , 'next_bitstring': next_bitstring
+                    , 'next_bitstring_percentage': next_bitstring_percentage
+                    , 'QVF':qvf
+                    , 'first_qubit_injected':data['wires'][i]
+                    , 'first_phi':data['phi0']
+                    , 'first_theta':data['theta0']
+                    , 'second_qubit_injected':data['second_wires'][i]
+                    , 'second_phi':data['phi1']
+                    , 'second_theta':data['theta1']
+                    # , 'gate_injected':data['circuits_injections'][i].metadata['gate_inserted']
+                    #, 'lambda':data['circuits_injections'][i].metadata['lambda']
+                    , 'circuit_name':data['name']
+                    }
+        else:
+            result = {'gold_bitstring':gold_bitstring
+                    , 'gold_count_%':gold_percentage
+                    , 'original_gold_count_%':original_gold_percentage
+                    , 'next_bitstring': next_bitstring
+                    , 'next_bitstring_%': next_bitstring_percentage
+                    , 'QVF':qvf
+                    , 'qubit_injected':data['wires'][i]
+                    , 'phi':data['phi0']
+                    , 'theta':data['theta0']
+                    , 'gate_injected':data['ops'][i]
+                    , 'wire_injected':data['wires'][i]
+                    , 'circuit_name':data['name']
+                    }            
         results.append(result)
     return pd.DataFrame(results)
 
@@ -100,12 +129,12 @@ def filter_single_fi(results):
     """Returns only the faults for which no secondary fault was injected"""
     return results[(results.second_phi == 0) & (results.second_theta == 0)]
 
-def read_file(filename):
+def read_file(filename, single = False):
     """Read a partial result file"""
     df_newQVF = pd.DataFrame()
     data = pickle.load(gzip.open(filename, 'r'))
     for d in data:
-        df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d)], ignore_index=True)
+        df_newQVF = pd.concat([df_newQVF, build_DF_newQVF(d, single = single)], ignore_index=True)
     del data
     return df_newQVF
 

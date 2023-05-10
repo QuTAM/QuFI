@@ -61,19 +61,13 @@ def get_qiskit_coupling_map(qnode, device_backend):
 
     return coupling_map
 
-def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()):
+def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago(), noise = True):
     """Internally called function which runs the circuits for all golden/faulty noiseless/noisy combinations"""
     # Execute golden circuit simulation without noise
     log('Running circuits')
     gold_device = qml.device('lightning.qubit', wires=base_circuit.device.num_wires)
     gold_qnode = qml.QNode(base_circuit.func, gold_device)
     answer_gold = probs_to_counts(gold_qnode(), base_circuit.device.num_wires)
-
-    # Execute golden circuit simulation with noise
-    noise_model = NoiseModel.from_backend(device_backend)
-    gold_device_noisy = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='aer_simulator', noise_model=noise_model)
-    gold_qnode_noisy = qml.QNode(base_circuit.func, gold_device_noisy)
-    answer_gold_noise = probs_to_counts(gold_qnode_noisy(), base_circuit.device.num_wires)
 
     # Execute injection circuit simulations without noise
     answers = []
@@ -83,18 +77,27 @@ def run_circuits(base_circuit, generated_circuits, device_backend=FakeSantiago()
         answer = probs_to_counts(inj_qnode(), base_circuit.device.num_wires)
         answers.append(answer)
 
-    # Execute injection circuit simulations with noise
-    answers_noise = []
-    for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
-        inj_device_noisy = qml.device('qiskit.aer', wires=c.device.num_wires, backend='aer_simulator', noise_model=noise_model)
-        inj_qnode_noisy = qml.QNode(c.func, inj_device_noisy)
-        answer_noise = probs_to_counts(inj_qnode_noisy(), base_circuit.device.num_wires)
-        answers_noise.append(answer_noise)
+    if noise == True:
+        # Execute golden circuit simulation with noise
+        noise_model = NoiseModel.from_backend(device_backend)
+        gold_device_noisy = qml.device('qiskit.aer', wires=base_circuit.device.num_wires, backend='aer_simulator', noise_model=noise_model)
+        gold_qnode_noisy = qml.QNode(base_circuit.func, gold_device_noisy)
+        answer_gold_noise = probs_to_counts(gold_qnode_noisy(), base_circuit.device.num_wires)
 
-    return {'output_gold':answer_gold, 'output_injections':answers
-            , 'output_gold_noise':answer_gold_noise, 'output_injections_noise':answers_noise
-            , 'noise_target':str(device_backend)
-            }
+        # Execute injection circuit simulations with noise
+        answers_noise = []
+        for c, i in zip(generated_circuits, range(0, len(generated_circuits))):
+            inj_device_noisy = qml.device('qiskit.aer', wires=c.device.num_wires, backend='aer_simulator', noise_model=noise_model)
+            inj_qnode_noisy = qml.QNode(c.func, inj_device_noisy)
+            answer_noise = probs_to_counts(inj_qnode_noisy(), base_circuit.device.num_wires)
+            answers_noise.append(answer_noise)
+
+        return {'output_gold':answer_gold, 'output_injections':answers
+                , 'output_gold_noise':answer_gold_noise, 'output_injections_noise':answers_noise
+                , 'noise_target':str(device_backend)
+                }
+    
+    return {'output_gold':answer_gold, 'output_injections':answers}
 
 def convert_qiskit_circuit(qiskit_circuit):
     """Converts a qiskit QuantumCircuit object to a pennylane QNode object"""
@@ -159,6 +162,7 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
     inj_info = []
     index_info = []
+    op_info = []
     # with tape as tape:
     index = 0
     for op in base_circuit.tape.operations:
@@ -172,19 +176,21 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
             transformed_qnode()
             mycircuits.append(transformed_qnode)
             inj_info.append(wire)
+            op_info.append(op.name)
             index_info.append(index)
         index = index + 1
     log(f"{len(mycircuits)} circuits generated\n")
-    return mycircuits, inj_info, index_info
+    return mycircuits, op_info, inj_info, index_info
 
 def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     """Wrapper for constructing the single fault circuits object"""
     output = {'name': name, 'base_circuit':circuit, 'theta0':theta, 'phi0':phi, 'theta1':0, 'phi1':0, 'lambda':lam}
     output['pennylane_version'] = qml.version()
     #print(qml.draw(circuit)())
-    generated_circuits, wires, indexes = pl_generate_circuits(circuit, name, theta, phi, lam)
+    generated_circuits, operations, wires, indexes = pl_generate_circuits(circuit, name, theta, phi, lam)
     output['generated_circuits'] = generated_circuits
     output['wires'] = wires
+    output['ops'] = operations
     output['second_wires'] = wires
     output['indexes'] = indexes
     return output
@@ -226,9 +232,9 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
     r['generated_circuits'] = double_fault_circuits
     return r
 
-def pl_inject(circuitStruct):
+def pl_inject(circuitStruct, noise = True):
     """Run a single/double fault circuits object"""
-    circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'] ) )
+    circuitStruct.update(run_circuits( circuitStruct['base_circuit'], circuitStruct['generated_circuits'], noise=noise))
 
 def execute_over_range(circuits,
             angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
@@ -236,6 +242,7 @@ def execute_over_range(circuits,
                     'theta1':np.arange(0, np.pi+0.01, np.pi/12), 
                     'phi1':np.arange(0, 2*np.pi+0.01, np.pi/12)}, 
             coupling_map=None,
+            noise = True,
             results_folder="./tmp/"):
     """Given a range of angles, build all single/double fault injection circuits and run them sequentially"""
     results_folder = "./tmp/"
@@ -268,7 +275,7 @@ def execute_over_range(circuits,
                 tmp_results = []
                 for angle_pair2 in angle_combinations_df:
                     s = pl_insert_df(deepcopy(r), circuit[1], angle_pair2[0], angle_pair2[1], coupling_map)
-                    pl_inject(s)
+                    pl_inject(s, noise=noise)
                     #results.append(s)
                     tmp_results.append(s)
                     tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_{angle_pair2[0]}_{angle_pair2[1]}.p.gz"
@@ -277,11 +284,56 @@ def execute_over_range(circuits,
                 tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0.0_0.0.p.gz"
                 save_results(tmp_results, tmp_name)
             else:
-                pl_inject(r)
+                pl_inject(r, noise=noise)
                 #results.append(r)
                 tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0.0_0.0.p.gz"
                 save_results([r], tmp_name)
                 results_names.append(tmp_name)  
+        tendint = datetime.datetime.now()
+        log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
+    tend = datetime.datetime.now()
+    log(f"Done: {tend}\nTotal elapsed time: {tend-tstart}\n")
+
+    # return results
+    return results_names
+
+def execute_over_range_single(circuits,
+            angles={'theta0':np.arange(0, np.pi+0.01, np.pi/12), 
+                    'phi0':np.arange(0, 2*np.pi+0.01, np.pi/12)}, 
+            coupling_map=None,
+            noise = True,
+            results_folder="./tmp/"):
+    """Given a range of angles, build all single/double fault injection circuits and run them sequentially"""
+    results_folder = "./tmp/"
+    #results = []
+    results_names = []
+    tstart = datetime.datetime.now()
+    log(f"Start: {tstart}")
+    for circuit in circuits:
+        log(f"-"*80+"\n")
+        tstartint = datetime.datetime.now()
+        log(f"Circuit {circuit[1]} start: {tstartint}")
+        angle_combinations = product(angles['theta0'], angles['phi0'])
+        for angle_pair1 in angle_combinations:
+            # Converting the circuit only once at the start of outer loop causes reference bugs (insight needed)
+            if isinstance(circuit[0], qml.QNode):
+                target_circuit = circuit[0]
+            elif isinstance(circuit[0], qiskitQC):
+                target_circuit = convert_qiskit_circuit(circuit)
+            elif isinstance(circuit[0], str) and circuit[0].startswith("OPENQASM"):
+                target_circuit = convert_qasm_circuit(circuit)
+            else:
+                log(f"Unsupported {type(circuit[0])} object, injection stopped.")
+                exit()
+
+            log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]}")
+            copy_of_circuit = deepcopy(target_circuit)
+            r = pl_insert(copy_of_circuit, circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
+            pl_inject(r, noise=noise)
+            #results.append(r)
+            tmp_name = f"{results_folder}{circuit[1]}_{round(angle_pair1[0],3)}_{round(angle_pair1[1],3)}.p.gz"
+            save_results([r], tmp_name)
+            results_names.append(tmp_name)  
         tendint = datetime.datetime.now()
         log(f"Done: {tendint}\nElapsed time: {tendint-tstartint}\n"+"-"*80+"\n")
     tend = datetime.datetime.now()
