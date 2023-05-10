@@ -274,12 +274,12 @@ def execute_over_range(circuits,
                     tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_{angle_pair2[0]}_{angle_pair2[1]}.p.gz"
                     #save_results([s], tmp_name)
                     results_names.append(tmp_name)
-                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0_0.p.gz"
+                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0.0_0.0.p.gz"
                 save_results(tmp_results, tmp_name)
             else:
                 pl_inject(r)
                 #results.append(r)
-                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0_0.p.gz"
+                tmp_name = f"{results_folder}{circuit[1]}_{angle_pair1[0]}_{angle_pair1[1]}_0.0_0.0.p.gz"
                 save_results([r], tmp_name)
                 results_names.append(tmp_name)  
         tendint = datetime.datetime.now()
