@@ -56,8 +56,8 @@ def get_qiskit_coupling_map(qnode, device_backend):
     tcirc = transpile(bv4_qiskit, simulator, optimization_level=3)
     coupling_map = {}
     coupling_map['topology'] = set(tuple(sorted(l)) for l in device_backend.configuration().to_dict()['coupling_map'])
-    coupling_map['logical2physical'] = { k._index:v for (k,v) in tcirc._layout.get_virtual_bits().items() if k._register.name == 'q'}
-    coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.get_physical_bits().items() if v._register.name == 'q'}
+    coupling_map['logical2physical'] = { k._index:v for (k,v) in tcirc._layout.initial_layout.get_virtual_bits().items() if k._register.name == 'q'}
+    coupling_map['physical2logical'] = { k:v._index for (k, v) in tcirc._layout.initial_layout.get_physical_bits().items() if v._register.name == 'q'}
 
     return coupling_map
 
@@ -111,7 +111,7 @@ def convert_qiskit_circuit(qiskit_circuit):
         return qml.probs(wires=measure_list) #[qml.expval(qml.PauliZ(i)) for i in range(qregs)]
     # Do NOT remove this evaluation, else the qnode can't bind the function before exiting convert_qiskit_circuit()'s context
     conv_circuit()
-    #print(qml.draw(conv_circuit)())
+    # print(qml.draw(conv_circuit)())
     return conv_circuit
 
 def convert_qasm_circuit(qasm_circuit):
@@ -159,23 +159,23 @@ def pl_generate_circuits(base_circuit, name, theta=0, phi=0, lam=0):
     mycircuits = []
     inj_info = []
     index_info = []
-    with base_circuit.tape as tape:
-        index = 0
-        for op in tape.operations:
-            for wire in op.wires:
-                shots = 1024
-                transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
-                device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
-                transformed_qnode = qml.QNode(transformed_circuit, device)
-                log(f'Generated single fault circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
-                #print(qml.draw(transformed_qnode)())
-                transformed_qnode()
-                mycircuits.append(transformed_qnode)
-                inj_info.append(wire)
-                index_info.append(index)
-            index = index + 1
-        log(f"{len(mycircuits)} circuits generated\n")
-        return mycircuits, inj_info, index_info
+    # with tape as tape:
+    index = 0
+    for op in base_circuit.tape.operations:
+        for wire in op.wires:
+            shots = 1024
+            transformed_circuit = pl_insert_gate(index, wire, theta, phi, lam)(base_circuit.func)
+            device = qml.device('lightning.qubit', wires=len(base_circuit.tape.wires), shots=shots)
+            transformed_qnode = qml.QNode(transformed_circuit, device)
+            log(f'Generated single fault circuit: {name} with fault on ({op.name}, wire:{wire}), theta = {theta}, phi = {phi}')
+            #print(qml.draw(transformed_qnode)())
+            transformed_qnode()
+            mycircuits.append(transformed_qnode)
+            inj_info.append(wire)
+            index_info.append(index)
+        index = index + 1
+    log(f"{len(mycircuits)} circuits generated\n")
+    return mycircuits, inj_info, index_info
 
 def pl_insert(circuit, name, theta=0, phi=0, lam=0):
     """Wrapper for constructing the single fault circuits object"""
@@ -198,29 +198,30 @@ def pl_insert_df(r, name, theta1, phi1, coupling_map):
     double_fault_circuits = []
     
     for qnode, wire, index in zip(r['generated_circuits'], r['wires'], r['indexes']):
-        with qnode.tape as tape:
-            for gate in tape.operations:
-                if gate.id == 'FAULT':
-                    for logical_qubit in tape.wires:
-                        physical_qubit = coupling_map['logical2physical'][logical_qubit]
-                        neighbouring_qubits = [el[1] for el in coupling_map['topology'] if el[0]==physical_qubit]
-                        # Don't loop over all logical qubits, just over the ones connected! Kinda
-                        for neighbor in neighbouring_qubits:
-                            if neighbor not in coupling_map['physical2logical'].keys() or coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
+        # with qnode.tape as tape:
+        tape = qnode.tape
+        for gate in tape.operations:
+            if gate.id == 'FAULT':
+                for logical_qubit in tape.wires:
+                    physical_qubit = coupling_map['logical2physical'][logical_qubit]
+                    neighbouring_qubits = [el[1] for el in coupling_map['topology'] if el[0]==physical_qubit]
+                    # Don't loop over all logical qubits, just over the ones connected! Kinda
+                    for neighbor in neighbouring_qubits:
+                        if neighbor not in coupling_map['physical2logical'].keys() or coupling_map['physical2logical'][neighbor] not in range(len(tape.wires)):
+                            continue
+                        else:
+                            second_fault_wire = coupling_map['physical2logical'][neighbor]
+                            if second_fault_wire in gate.wires:
                                 continue
-                            else:
-                                second_fault_wire = coupling_map['physical2logical'][neighbor]
-                                if second_fault_wire in gate.wires:
-                                    continue
-                                double_fault_circuit = pl_insert_df_gate(index, second_fault_wire, theta1, phi1)(deepcopy(qnode).func)
-                                double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
-                                double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
-                                double_fault_qnode()
-                                log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta0:{gate.parameters[0]:.2f}, phi0:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta1:{theta1:.2f}, phi1:{phi1:.2f})')
-                                #print(qml.draw(double_fault_qnode)())
-                                double_fault_circuits.append(double_fault_qnode)
-                                r['second_wires'].append(second_fault_wire)
-                                r['wires'].append(wire)
+                            double_fault_circuit = pl_insert_df_gate(index, second_fault_wire, theta1, phi1)(deepcopy(qnode).func)
+                            double_fault_device = qml.device('lightning.qubit', wires=len(tape.wires), shots=shots)
+                            double_fault_qnode = qml.QNode(double_fault_circuit, double_fault_device)
+                            double_fault_qnode()
+                            log(f'Generated double fault circuit: {name} with faults on (wire1:{wire}, theta0:{gate.parameters[0]:.2f}, phi0:{gate.parameters[1]:.2f}) and (wire2:{second_fault_wire}, theta1:{theta1:.2f}, phi1:{phi1:.2f})')
+                            #print(qml.draw(double_fault_qnode)())
+                            double_fault_circuits.append(double_fault_qnode)
+                            r['second_wires'].append(second_fault_wire)
+                            r['wires'].append(wire)
     log(f"{len(double_fault_circuits)} double fault circuits generated\n")
     r['generated_circuits'] = double_fault_circuits
     return r
@@ -260,7 +261,8 @@ def execute_over_range(circuits,
                 exit()
 
             log(f"-"*80+"\n"+f"Injecting circuit: {circuit[1]} theta0: {angle_pair1[0]} phi0: {angle_pair1[1]}")
-            r = pl_insert(deepcopy(target_circuit), circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
+            copy_of_circuit = deepcopy(target_circuit)
+            r = pl_insert(copy_of_circuit, circuit[1], theta=angle_pair1[0], phi=angle_pair1[1])
             if coupling_map != None:
                 angle_combinations_df = product(np.arange(0, angle_pair1[0]+0.01, np.pi/12), np.arange(0, angle_pair1[1]+0.01, np.pi/12)) #product(angles['theta1'], angles['phi1']) to loop over the provided theta1/phi1 values
                 tmp_results = []

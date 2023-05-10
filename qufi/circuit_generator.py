@@ -35,11 +35,11 @@ class BernsteinVazirani:
             #Apply Hadamard gates after querying the oracle
             for i in range(n):
                 qml.Hadamard(wires=i)
-
+            
             return qml.probs(wires=range(n))
 
         circuit()
-
+        # print(circuit.tape.operations)
         return circuit
 
 class DeutschJozsa:

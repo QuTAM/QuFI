@@ -1,6 +1,6 @@
 #%%
 import numpy as np
-from qiskit.test.mock import FakeSantiago
+from qiskit.providers.fake_provider import FakeSantiago
 from qufi import execute_over_range, BernsteinVazirani, get_qiskit_coupling_map, read_results_directory, generate_all_statistics
 
 #%%
@@ -9,7 +9,7 @@ circuits = []
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-angles = {'theta0':[1, 2], 'phi0':[2, 3], 'theta1':[3, 4], 'phi1':[4, 5]}
+angles = {'theta0':[0, 0], 'phi0':[0, 0], 'theta1':[0, 0], 'phi1':[0, 0]}
 
 #%%
 device_backend = FakeSantiago()
