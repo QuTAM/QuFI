@@ -4,7 +4,17 @@ This repository contains the Pennylane code adaptation work of the original Qisk
 
 ## Installation
 
-All the dependencies of this project can be installed through the [requirements.txt](requirements.txt) file.  
+All the dependencies of this project can be installed through the [requirements.txt](requirements.txt) file.
+
+### Creating a virtual environment
+
+You can create a virtual environment by installing [miniconda](https://docs.conda.io/en/latest/miniconda.html) and then running the following code:
+```
+conda create -n qufi_tutorial python=3.9
+conda activate qufi_tutorial
+pip3 install -r tutorial_requirements.txt
+```
+
 
 ## Usage
 
