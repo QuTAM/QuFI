@@ -1,7 +1,7 @@
 #%%
 import numpy as np
-from qiskit.providers.fake_provider import FakeSantiago
-from qufi import execute_over_range_single, BernsteinVazirani, get_qiskit_coupling_map, read_file
+from qufi import execute_over_range_single, BernsteinVazirani, read_file
+from itertools import product
 
 #%%
 circuits = []
@@ -9,21 +9,21 @@ circuits = []
 bv4_p = BernsteinVazirani.build_circuit(3, '101')
 circuits.append((bv4_p, 'Bernstein-Vazirani_4'))
 
-angles = {'theta0':[0, np.pi/4], 'phi0':[0, np.pi/4]}
+angles = {'theta0':[0, round(np.pi/4, 3)], 'phi0':[0, round(np.pi/4, 3)]}
+
 
 #%%
-# device_backend = FakeSantiago()
-# coupling_map = get_qiskit_coupling_map(circuits[0][0], device_backend)
+results_names = execute_over_range_single(circuits, angles, noise=False, 
+                                          results_folder="./tmp/")
 
-#%%
-results_names = execute_over_range_single(circuits, angles, noise=False, results_folder="./tmp/")
 # %%
 results = []
 for name in results_names:
     results.append(read_file(f"{name}", single = True))
 
 # %%
-for i, res in enumerate(results):
-    results[i].to_csv(f'example_result_{i+1}.csv', index=False, header = True)
+combinations = product(angles['theta0'], angles['phi0'])
+for i, comb in enumerate(combinations):
+    results[i].to_csv(f'example_result_{comb}.csv', index=False, header=True)
 
 # %%
